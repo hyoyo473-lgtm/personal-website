@@ -1,0 +1,70 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure Environment Variables
+        run: |
+          echo "🔧 設定系統環境變數..."
+          
+          # 優先取用 GitHub Repository Secrets 中的 GOOGLE_APP_SCRIPT_URL
+          # 若尚未於 Secrets 設定，則讀取 .env.example 作為備援預設值
+          if [ -n "${{ secrets.GOOGLE_APP_SCRIPT_URL }}" ]; then
+            URL="${{ secrets.GOOGLE_APP_SCRIPT_URL }}"
+            echo "✅ 已成功自 GitHub Secrets 讀取 GOOGLE_APP_SCRIPT_URL"
+          elif [ -f .env.example ]; then
+            URL=$(grep '^GOOGLE_APP_SCRIPT_URL=' .env.example | cut -d '=' -f2- || echo "")
+            echo "ℹ️ 自 .env.example 讀取預設 GOOGLE_APP_SCRIPT_URL"
+          else
+            URL=""
+            echo "⚠️ 未設定 GOOGLE_APP_SCRIPT_URL"
+          fi
+
+          # 產製 .env 供 HTTP 伺服器讀取
+          echo "GOOGLE_APP_SCRIPT_URL=$URL" > .env
+
+          # 同步注入 env.js 供前端直接載入
+          cat << EOF > env.js
+          /**
+           * 由 GitHub Actions 自動部署時產製之環境變數設定
+           */
+          window.__ENV__ = Object.assign(window.__ENV__ || {}, {
+            GOOGLE_APP_SCRIPT_URL: "$URL"
+          });
+          EOF
+
+          echo "🚀 環境變數設定完成！"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

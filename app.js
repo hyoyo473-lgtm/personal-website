@@ -2968,7 +2968,9 @@ function renderAdminSecurity() {
   const container = document.getElementById("adminTabPane-security");
   if (!container) return;
 
-  const currentGasUrl = localStorage.getItem("ROUTINE_GAS_URL") || "";
+  const cfg = getCloudSyncConfig();
+  const currentGasUrl = cfg.gasUrl;
+  const isEnvConfigured = Boolean(cfg.envGasUrl && currentGasUrl === cfg.envGasUrl);
 
   container.innerHTML = `
     <div class="grid-2col">
@@ -3022,7 +3024,7 @@ function renderAdminSecurity() {
         <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-md); padding: 0.85rem 1rem; margin-bottom: 1rem;">
           <div style="font-size: 0.82rem; color: var(--slate-700); margin-bottom: 4px;">
             <strong>雲端連線狀態：</strong>
-            <span>${currentGasUrl ? '🟢 已綁定 Google Apps Script' : '⚪ 尚未設定 (本機離線模式)'}</span>
+            <span>${currentGasUrl ? ('🟢 已綁定 Google Apps Script' + (isEnvConfigured ? ' <span style="font-size: 0.72rem; color: var(--primary-700); background: var(--primary-50); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--primary-200); font-weight: 600;">.env 環境變數</span>' : '')) : '⚪ 尚未設定 (本機離線模式)'}</span>
           </div>
           <div style="font-size: 0.75rem; color: var(--slate-500); word-break: break-all;">
             <strong>目前 API 網址：</strong>
@@ -3114,12 +3116,91 @@ function changeAdminPassword(event) {
 }
 
 // ==========================================================================
+// 環境變數解析與管理模組 (.env / env.js)
+// ==========================================================================
+function getEnv(key) {
+  if (typeof window !== "undefined") {
+    if (window.ENV && window.ENV[key] !== undefined && String(window.ENV[key]).trim() !== "") {
+      return String(window.ENV[key]).trim();
+    }
+    if (window.__ENV__ && window.__ENV__[key] !== undefined && String(window.__ENV__[key]).trim() !== "") {
+      return String(window.__ENV__[key]).trim();
+    }
+  }
+  if (typeof process !== "undefined" && process.env && process.env[key] !== undefined && String(process.env[key]).trim() !== "") {
+    return String(process.env[key]).trim();
+  }
+  return "";
+}
+
+function parseEnvString(text) {
+  const result = {};
+  if (!text || typeof text !== "string") return result;
+  const lines = text.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx !== -1) {
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
+async function initEnvConfig() {
+  window.ENV = window.ENV || {};
+  window.__ENV__ = window.__ENV__ || {};
+
+  // 嘗試讀取根目錄 .env 檔案（在 http/https 本機或伺服器環境中生效）
+  if (typeof fetch === "function") {
+    try {
+      const res = await fetch(".env", { cache: "no-store" });
+      if (res.ok) {
+        const text = await res.text();
+        const parsed = parseEnvString(text);
+        for (const [k, v] of Object.entries(parsed)) {
+          if (v) {
+            window.ENV[k] = v;
+            window.__ENV__[k] = v;
+          }
+        }
+      }
+    } catch (e) {
+      // 本地 file:// 或無 .env 時靜默略過
+    }
+  }
+
+  // 若環境變數包含 GOOGLE_APP_SCRIPT_URL
+  const envGasUrl = getEnv("GOOGLE_APP_SCRIPT_URL");
+  if (envGasUrl) {
+    const localSaved = localStorage.getItem("ROUTINE_GAS_URL");
+    if (!localSaved) {
+      localStorage.setItem("ROUTINE_GAS_URL", envGasUrl);
+    }
+    initCloudSyncStatus();
+  }
+}
+
+// ==========================================================================
 // Google 試算表 (Google Sheets & Apps Script) 雲端資料庫同步模組
 // ==========================================================================
 let autoSaveCloudTimer = null;
 
 function getCloudSyncConfig() {
+  const envGasUrl = getEnv("GOOGLE_APP_SCRIPT_URL");
   let gasUrl = localStorage.getItem("ROUTINE_GAS_URL") || "";
+
+  // 若本機尚未手動設定過，且有環境變數配置，優先以環境變數為預設值
+  if (!gasUrl && envGasUrl) {
+    gasUrl = envGasUrl;
+  }
+
   let autoSync = localStorage.getItem("ROUTINE_GAS_AUTOSYNC") !== "false";
   let lastSyncedAt = localStorage.getItem("ROUTINE_GAS_LASTSYNC") || "";
 
@@ -3131,7 +3212,7 @@ function getCloudSyncConfig() {
     localStorage.setItem("ROUTINE_GAS_AUTOSYNC", autoSync ? "true" : "false");
   }
 
-  return { gasUrl, autoSync, lastSyncedAt };
+  return { gasUrl, autoSync, lastSyncedAt, envGasUrl };
 }
 
 function updateCloudSyncBadge(status = "offline", text = "離線模式") {
@@ -3171,9 +3252,19 @@ function openCloudSyncModal() {
   const cfg = getCloudSyncConfig();
   const input = document.getElementById("gasApiUrlInput");
   const checkbox = document.getElementById("autoCloudSyncCheckbox");
+  const envNotice = document.getElementById("gasEnvNotice");
 
   if (input) input.value = cfg.gasUrl;
   if (checkbox) checkbox.checked = cfg.autoSync;
+
+  if (envNotice) {
+    if (cfg.envGasUrl) {
+      envNotice.style.display = "block";
+      envNotice.innerHTML = `⚡ 已載入環境變數設定 (<code>GOOGLE_APP_SCRIPT_URL</code>)`;
+    } else {
+      envNotice.style.display = "none";
+    }
+  }
 
   const modal = document.getElementById("cloudSyncModal");
   if (modal) {
@@ -3373,6 +3464,7 @@ function triggerAutoCloudSave() {
 // 應用程式初始化事件監聽
 document.addEventListener("DOMContentLoaded", () => {
   initStorage();
+  initEnvConfig();
 
   // 預設日期為今天
   const today = new Date().toISOString().split("T")[0];

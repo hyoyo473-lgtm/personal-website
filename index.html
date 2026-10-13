@@ -746,6 +746,7 @@
             <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 600;">※ 依 README.md 教學取得</span>
           </label>
           <input type="url" id="gasApiUrlInput" class="input-text" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="font-family: monospace; font-size: 0.82rem;">
+          <div id="gasEnvNotice" style="display: none; font-size: 0.75rem; color: var(--primary-700); background: var(--primary-50); border: 1px solid var(--primary-200); padding: 5px 10px; border-radius: var(--radius-sm); margin-top: 6px;"></div>
           <div style="font-size: 0.75rem; color: var(--slate-500); margin-top: 4px;">
             提示：部屬時權限須設為「任何人 (Anyone)」，網址格式以 <code>https://script.google.com/macros/s/.../exec</code> 結尾
           </div>
@@ -1157,6 +1158,7 @@
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
+  <script src="env.js"></script>
   <script src="sampleData.js"></script>
   <script src="app.js"></script>
 
