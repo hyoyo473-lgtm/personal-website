@@ -26,35 +26,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure Environment Variables
+        env:
+          SECRET_GAS_URL: ${{ secrets.GOOGLE_APP_SCRIPT_URL }}
         run: |
           echo "🔧 設定系統環境變數..."
-          
-          # 優先取用 GitHub Repository Secrets 中的 GOOGLE_APP_SCRIPT_URL
-          # 若尚未於 Secrets 設定，則讀取 .env.example 作為備援預設值
-          if [ -n "${{ secrets.GOOGLE_APP_SCRIPT_URL }}" ]; then
-            URL="${{ secrets.GOOGLE_APP_SCRIPT_URL }}"
-            echo "✅ 已成功自 GitHub Secrets 讀取 GOOGLE_APP_SCRIPT_URL"
-          elif [ -f .env.example ]; then
-            URL=$(grep '^GOOGLE_APP_SCRIPT_URL=' .env.example | cut -d '=' -f2- || echo "")
-            echo "ℹ️ 自 .env.example 讀取預設 GOOGLE_APP_SCRIPT_URL"
-          else
-            URL=""
-            echo "⚠️ 未設定 GOOGLE_APP_SCRIPT_URL"
-          fi
-
-          # 產製 .env 供 HTTP 伺服器讀取
-          echo "GOOGLE_APP_SCRIPT_URL=$URL" > .env
-
-          # 同步注入 env.js 供前端直接載入
-          cat << EOF > env.js
-          /**
-           * 由 GitHub Actions 自動部署時產製之環境變數設定
-           */
-          window.__ENV__ = Object.assign(window.__ENV__ || {}, {
-            GOOGLE_APP_SCRIPT_URL: "$URL"
-          });
-          EOF
-
+          node -e '
+            const fs = require("fs");
+            let url = (process.env.SECRET_GAS_URL || "").trim();
+            if (!url && fs.existsSync(".env.example")) {
+              const example = fs.readFileSync(".env.example", "utf8");
+              const m = example.match(/^GOOGLE_APP_SCRIPT_URL=(.+)$/m);
+              if (m) url = m[1].trim();
+            }
+            console.log(url ? "✅ 取得 GOOGLE_APP_SCRIPT_URL" : "⚠️ 未設定 GOOGLE_APP_SCRIPT_URL");
+            fs.writeFileSync(".env", "GOOGLE_APP_SCRIPT_URL=" + url + "\n");
+            fs.writeFileSync("env.js", "/** 由 GitHub Actions 自動部署時產製之環境變數設定 */\nwindow.__ENV__ = Object.assign(window.__ENV__ || {}, {\n  GOOGLE_APP_SCRIPT_URL: " + JSON.stringify(url) + "\n});\n");
+          '
           echo "🚀 環境變數設定完成！"
 
       - name: Setup Pages

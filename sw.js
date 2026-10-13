@@ -1,10 +1,11 @@
 // 培英國中 學生生活常規優缺點管理系統 - Service Worker
-const CACHE_NAME = 'peiying-app-v1.0.0';
+const CACHE_NAME = 'peiying-app-v1.0.1';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './env.js',
   './sampleData.js',
   './manifest.json',
   './icons/icon-192.png',
@@ -43,8 +44,8 @@ self.addEventListener('fetch', (event) => {
   // 只處理 GET 請求
   if (event.request.method !== 'GET') return;
 
-  // 略過非 http/https（例如 chrome-extension 等）
-  if (!event.request.url.startsWith('http')) return;
+  // 外部 API（如 Google Apps Script 等外部網域）絕不攔截，直接走網路
+  if (!event.request.url.startsWith(self.location.origin)) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {

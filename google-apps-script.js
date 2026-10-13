@@ -369,7 +369,20 @@ function syncItemsSheet(ss, appData) {
   const rows = [headers];
 
   (appData.classes || []).forEach(cls => {
-    (cls.routineItems || []).forEach(item => {
+    const rItems = cls.routineItems || {};
+    const itemsList = [];
+    if (Array.isArray(rItems)) {
+      itemsList.push(...rItems);
+    } else {
+      if (Array.isArray(rItems.demerits)) {
+        rItems.demerits.forEach(item => itemsList.push({ ...item, type: "demerit" }));
+      }
+      if (Array.isArray(rItems.merits)) {
+        rItems.merits.forEach(item => itemsList.push({ ...item, type: "merit" }));
+      }
+    }
+
+    itemsList.forEach(item => {
       rows.push([
         cls.name || "",
         item.type === "merit" ? "優良獎勵 (+)" : "違規扣點 (-)",
