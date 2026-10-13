@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>學生生活常規優缺點管理系統</title>
+  <!-- Google Fonts: Noto Sans TC + Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- PWA & Mobile App Settings -->
+  <meta name="description" content="培英國中 學生生活常規優缺點管理系統 - 導師工作台、家長學生專區、學務處管理">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="培英優缺點">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand" onclick="goToLandingPortal()" style="cursor: pointer;" title="點擊返回分流入口">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>智慧校園 • 常規優缺點管理系統</h1>
+        </div>
+        <span class="brand-badge">115學年度</span>
+      </div>
+
+      <div class="nav-controls">
+        <!-- 班級選擇與管理 (導師模式顯示) -->
+        <div class="class-select-box" id="classSelectContainer" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <select id="classSelectDropdown" title="切換班級資料庫"></select>
+          <button class="btn btn-outline btn-sm" id="btnClassManagerInNav" onclick="openClassManagerModal()" title="班級與資料庫管理" style="padding: 2px 8px; font-size: 0.75rem;">
+            ⚙️ 班級管理
+          </button>
+        </div>
+
+        <!-- Google 試算表雲端同步狀態按鈕 -->
+        <button type="button" class="cloud-sync-status-btn" id="navCloudSyncBtn" onclick="openCloudSyncModal()" title="Google 試算表雲端同步設定與狀態">
+          <span class="cloud-status-dot offline" id="navCloudStatusDot"></span>
+          <span class="cloud-status-text" id="navCloudStatusText">離線模式</span>
+        </button>
+
+        <!-- 導航功能按鈕組 (由 app.js 動態渲染) -->
+        <div class="nav-actions-group" id="navRoleButtons"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-wrapper">
+
+    <!-- 管理員代管橫幅 (當管理員代表特定班級進入導師後台時顯示) -->
+    <div id="impersonationBanner" class="impersonate-banner" style="display: none;">
+      <div class="impersonate-banner-content">
+        <div>
+          ⚙️ <strong>校務管理員代管中：</strong>
+          目前正在為【<strong id="impersonateClassName">8年1班</strong> - <span id="impersonateTeacherName">林導師</span>】進行頁面管理與常規設定
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="exitImpersonation()" style="background: white; color: #1e293b; font-weight: 700;">
+          ↩️ 返回管理中心
+        </button>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW 0: 身分分流入口大廳 (LANDING / IDENTITY SELECTION PORTAL)
+         ==================================================================== -->
+    <div id="landingView">
+      <div class="landing-hero">
+        <div class="landing-badge">智慧校園 • 115學年度學生常規管理系統</div>
+        <h1 class="landing-title">智慧常規管理與查詢入口</h1>
+        <p class="landing-desc">
+          專為日常班級經營打造：座號盤快速登記、段考週期無相抵歸零、各班自訂門檻警告陳報、學生專屬隨機代碼隱私查詢。請選擇您的身分進入：
+        </p>
+
+        <!-- PWA 安裝按鈕 -->
+        <div class="landing-install-bar">
+          <button type="button" class="btn-install-app" id="btnInstallApp" onclick="handlePwaInstallClick()">
+            <span class="install-icon">📲</span>
+            <span class="install-text"><strong>安裝此系統為手機 / 電腦 App</strong>（免下載安裝檔、離線可用）</span>
+            <span class="install-badge">跨平台支援</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="role-cards-grid">
+        <!-- 身分卡片 1: 導師工作台 -->
+        <div class="portal-role-card teacher-card">
+          <div class="role-card-badge">班級導師專區</div>
+          <div class="role-card-icon">👨‍🏫</div>
+          <h2 class="role-card-title">導師工作台</h2>
+          <p class="role-card-subtitle">
+            供班級導師進行每日常規點選、段考週期管理、全班總表統計與警告處分陳報。
+          </p>
+
+          <div class="role-features-list">
+            <div class="feature-item">✓ 1 ~ 35 號座位盤一鍵快速登記優缺點</div>
+            <div class="feature-item">✓ 各班自訂缺點警告上限即時紅框預警與生教單列印</div>
+            <div class="feature-item">✓ 段考週期獨立歸零（無功過相抵）</div>
+            <div class="feature-item">✓ 匯出 Excel 統計表與家長通知小卡排版</div>
+          </div>
+
+          <div class="role-action-box">
+            <form onsubmit="loginTeacherWithPassword(event)">
+              <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.35rem;">輸入班級導師專屬密碼：</label>
+              <div style="position: relative; margin-bottom: 0.75rem;">
+                <input type="password" id="landingTeacherPasswordInput" class="input-text" placeholder="請輸入導師專屬密碼" autocomplete="current-password" required style="width: 100%; padding-right: 40px; font-weight: 700; letter-spacing: 1px;">
+                <button type="button" onclick="togglePasswordVisibility('landingTeacherPasswordInput')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--slate-400); font-size: 1rem;" title="顯示/隱藏密碼">👁️</button>
+              </div>
+              <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                登入導師工作台 ➜
+              </button>
+              <div style="font-size: 0.75rem; color: var(--slate-400); text-align: center; margin-top: 0.5rem;">
+                ※ 各班專屬密碼統一由校務管理者設定與核發
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- 身分卡片 2: 學生/家長查詢專區 -->
+        <div class="portal-role-card student-card">
+          <div class="role-card-badge student-badge">學生與家長專區</div>
+          <div class="role-card-icon">👨‍👩‍👧</div>
+          <h2 class="role-card-title">學生 / 家長查詢</h2>
+          <p class="role-card-subtitle">
+            學生與家長僅需輸入個人專屬隨機代碼即可查詢，無需帳號密碼，完全零個資風險。
+          </p>
+
+          <div class="role-features-list">
+            <div class="feature-item">✓ 專屬英數隨機代碼登入，絕不洩漏個資</div>
+            <div class="feature-item">✓ 即時查看目前段考缺點、優點累積次數</div>
+            <div class="feature-item">✓ 距離班級警告上限尚餘次數與警示提醒</div>
+            <div class="feature-item">✓ 完整時間與違規/表揚事由流水帳</div>
+          </div>
+
+          <div class="role-action-box">
+            <form onsubmit="queryStudentDirectlyFromLanding(event)">
+              <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.35rem;">輸入學生個人專屬代碼：</label>
+              <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <input type="text" id="landingStudentCodeInput" class="input-text" placeholder="例：801-K8P2" maxlength="15" autocomplete="off" style="font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">
+                <button type="submit" class="btn btn-success" style="white-space: nowrap; padding: 0.65rem 1.25rem;">
+                  查詢 ➜
+                </button>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--slate-400); text-align: center;">
+                ※ 可在聯絡簿通知條上查閱代碼，或洽班級導師補發
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分流首頁底部獨立的管理者登入區塊 -->
+      <div class="landing-admin-footer">
+        <div class="admin-footer-content">
+          <div class="admin-footer-text">
+            <span class="admin-badge">行政管理者專區</span>
+            <h4>校務行政與系統管理者登入</h4>
+            <p>提供全校各班導師設定、基本資料維護、名冊代碼管理、全域常規標準項目設定與系統備份。</p>
+          </div>
+          <button type="button" class="btn btn-outline admin-login-trigger-btn" onclick="openAdminLoginModal()">
+            🔐 校務管理者登入
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW 1: 導師管理面板 (TEACHER VIEW)
+         ==================================================================== -->
+    <div id="teacherView" style="display: none;">
+      
+      <!-- 目前段考橫幅 (可快速點擊切換) -->
+      <div class="period-banner" id="periodBannerContainer">
+        <!-- 由 app.js 動態渲染 -->
+      </div>
+
+      <!-- 導師子分頁選單 -->
+      <nav class="sub-nav">
+        <button class="sub-nav-item active" data-tab="record" onclick="switchTeacherTab('record')">
+          <span>📝 快速登記常規</span>
+        </button>
+        <button class="sub-nav-item" data-tab="overview" onclick="switchTeacherTab('overview')">
+          <span>📊 全班常規總表</span>
+        </button>
+        <button class="sub-nav-item" data-tab="warnings" onclick="switchTeacherTab('warnings')">
+          <span id="tabWarningsTitleText">🚨 處分警告名單</span>
+          <span class="badge-count danger" id="tabWarningBadge" style="display: none;">0</span>
+        </button>
+        <button class="sub-nav-item" data-tab="students" onclick="switchTeacherTab('students')">
+          <span>👥 學生名冊與代碼 (上限35人)</span>
+        </button>
+        <button class="sub-nav-item" data-tab="routine-items" onclick="switchTeacherTab('routine-items')">
+          <span>⚙️ 常規項目自訂</span>
+        </button>
+        <button class="sub-nav-item" data-tab="periods" onclick="switchTeacherTab('periods')">
+          <span>📅 段考週期設定</span>
+        </button>
+      </nav>
+
+      <!-- ------------------------------------------------------------------
+           分頁 1：快速登記常規
+           ------------------------------------------------------------------ -->
+      <div id="tabPane-record" class="tab-pane">
+        <div class="grid-2col">
+          
+          <!-- 左側：1 ~ 35 號座位點選區 -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">
+                <span>🪑 學生座號盤 (1 ~ 35 號)</span>
+              </div>
+              <div id="selectedCountText" style="font-size: 0.85rem; font-weight: 700; color: var(--primary-600);">
+                已選取 0 位同學
+              </div>
+            </div>
+
+            <!-- 快速選取工具列 -->
+            <div class="quick-select-bar" style="margin-bottom: 1rem;">
+              <button type="button" class="btn-chip" onclick="selectAllStudents()">全選</button>
+              <button type="button" class="btn-chip" onclick="clearStudentSelection()">清除選取</button>
+              <button type="button" class="btn-chip" onclick="quickSelectBySeatNumbersPrompt()">輸入座號多選 (如 1, 3, 5-8)</button>
+              <span style="font-size: 0.75rem; color: var(--slate-400); margin-left: auto; align-self: center;">
+                ※ 數字旁標記為目前段考累積
+              </span>
+            </div>
+
+            <!-- 座號按鈕網格 -->
+            <div class="seat-grid" id="seatGrid">
+              <!-- 由 app.js 動態渲染 35 格按鈕 -->
+            </div>
+          </div>
+
+          <!-- 右側：登記表單與項目選擇 -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">
+                <span>✍️ 登記常規項目</span>
+              </div>
+              <span style="font-size: 0.8rem; color: var(--slate-500);">段考重新累積 • 不功過相抵</span>
+            </div>
+
+            <form id="recordForm" onsubmit="submitRoutineRecord(event)">
+              <!-- 類別切換：缺點 vs 優點 -->
+              <div class="type-tab-group">
+                <button type="button" class="type-tab-btn active type-demerit" id="btnTypeDemerit" onclick="setRecordingType('demerit')">
+                  🔴 登記缺點
+                </button>
+                <button type="button" class="type-tab-btn type-merit" id="btnTypeMerit" onclick="setRecordingType('merit')">
+                  🟢 登記優點
+                </button>
+              </div>
+
+              <!-- 日期與次數 -->
+              <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label">登記日期</label>
+                  <input type="date" id="recordDateInput" class="input-date" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label">登記次數</label>
+                  <input type="number" id="recordCountInput" class="input-text" value="1" min="1" max="10" required>
+                </div>
+              </div>
+
+              <!-- 常規項目清單標籤 -->
+              <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                  <label class="form-label" style="margin-bottom: 0;">點選常規項目</label>
+                  <button type="button" onclick="switchTeacherTab('routine-items')" style="border: none; background: none; color: var(--primary-600); font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                    + 管理項目
+                  </button>
+                </div>
+                <div class="item-tag-grid" id="itemTagGrid">
+                  <!-- 由 app.js 動態渲染 -->
+                </div>
+              </div>
+
+              <!-- 備註說明 (選填) -->
+              <div class="form-group">
+                <label class="form-label">詳細事由備註 (選填，例如作業名稱或具體事蹟)</label>
+                <input type="text" id="recordNoteInput" class="input-text" placeholder="例：數學習作第1單元缺交、協助搬運作業本...">
+              </div>
+
+              <!-- 送出登記按鈕 -->
+              <button type="submit" class="btn btn-primary btn-block" style="padding: 0.85rem; font-size: 1rem;">
+                💾 送出登記
+              </button>
+            </form>
+
+            <!-- 最近 8 筆登記流水帳 (防手殘撤銷) -->
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--slate-200);">
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--slate-700); margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
+                <span>🕒 最近登記流水帳</span>
+                <span style="font-size: 0.75rem; color: var(--slate-400);">按錯可即時撤銷</span>
+              </div>
+              <div id="recentRecordsList">
+                <!-- 由 app.js 動態渲染 -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ------------------------------------------------------------------
+           分頁 2：全班常規總表
+           ------------------------------------------------------------------ -->
+      <div id="tabPane-overview" class="tab-pane" style="display: none;">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>📊 全班學生常規統計總表</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="btn btn-outline btn-sm" onclick="exportOverviewToCSV()">
+                📥 匯出 Excel (CSV)
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="window.print()">
+                🖨️ 列印總表
+              </button>
+            </div>
+          </div>
+
+          <!-- 篩選器與搜尋列 -->
+          <div style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+              <input type="text" id="overviewSearchInput" class="input-text" placeholder="🔍 搜尋座號、姓名或專屬代碼..." oninput="renderOverviewTab(getCurrentClass(), getCurrentExamPeriod(getCurrentClass()))">
+            </div>
+            <div style="min-width: 180px;">
+              <select id="overviewPeriodFilter" class="input-select" onchange="renderOverviewTab(getCurrentClass(), getCurrentExamPeriod(getCurrentClass()))">
+                <!-- 由 app.js 動態載入 -->
+              </select>
+            </div>
+            <div style="min-width: 140px;">
+              <select id="overviewStatusFilter" class="input-select" onchange="renderOverviewTab(getCurrentClass(), getCurrentExamPeriod(getCurrentClass()))">
+                <option value="all">所有常規狀態</option>
+                <option value="warning" id="overviewOptWarning">🚨 達警告門檻</option>
+                <option value="caution" id="overviewOptCaution">⚠️ 接近警告警戒</option>
+                <option value="safe">正常良好</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 總表表格 -->
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 60px;">座號</th>
+                  <th style="width: 110px;">學生姓名</th>
+                  <th style="width: 120px;">專屬代碼</th>
+                  <th style="width: 90px;">缺點累積</th>
+                  <th style="width: 90px;">優點累積</th>
+                  <th style="width: 150px;" id="overviewWarningHeader">警告警戒指標</th>
+                  <th style="width: 130px;">狀態標籤</th>
+                  <th style="width: 140px;">操作</th>
+                </tr>
+              </thead>
+              <tbody id="overviewTableBody">
+                <!-- 由 app.js 動態渲染 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ------------------------------------------------------------------
+           分頁 3：處分警告提醒與設定專區
+           ------------------------------------------------------------------ -->
+      <div id="tabPane-warnings" class="tab-pane" style="display: none;">
+        
+        <!-- 導師自訂警告門檻設定條 -->
+        <div class="warning-threshold-banner">
+          <div>
+            <div class="warning-threshold-title">
+              ⚙️ 本班生活常規警告上限門檻設定
+            </div>
+            <div class="warning-threshold-desc">
+              每位導師標準不同，您可自由調整本班累計缺點達到幾次時觸發警告處分與生教陳報。
+            </div>
+          </div>
+          <div class="warning-threshold-controls">
+            <label style="font-size: 0.9rem; font-weight: 700; color: var(--slate-800);">警告次數上限：</label>
+            <input type="number" id="classWarningThresholdInput" class="input-text" min="1" max="100" style="width: 75px; text-align: center; font-weight: 800; font-size: 1.1rem; padding: 4px 8px;" onchange="saveClassWarningThreshold(this.value)">
+            <span style="font-weight: 700; color: var(--slate-700);">次</span>
+            <button type="button" class="btn btn-primary btn-sm" onclick="saveClassWarningThresholdBtn()">
+              儲存設定
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span id="warningsTabHeading">🚨 缺點達標警告提醒與陳報專區</span>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--slate-500);" id="warningsTabSubtitle">
+              段考內累積缺點達本班設定門檻送生教組覆核處分
+            </div>
+          </div>
+
+          <div id="warningsListContainer">
+            <!-- 由 app.js 動態渲染 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ------------------------------------------------------------------
+           分頁 4：學生名冊與專屬代碼管理 (上限 35 人)
+           ------------------------------------------------------------------ -->
+      <div id="tabPane-students" class="tab-pane" style="display: none;">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>👥 學生基本資料與專屬代碼管理 (上限 35 人)</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="btn btn-primary btn-sm" onclick="openBatchPasteStudentsModal()">
+                📋 批次貼上姓名 (Excel貼上)
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="openPrintSlipsModal()">
+                🖨️ 列印家長代碼通知小卡
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="regenerateAllCodes()">
+                🔄 重新生成全班隨機代碼
+              </button>
+            </div>
+          </div>
+
+          <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: var(--primary-800);">
+            💡 <strong>說明：</strong>系統為每位同學預設生成一組唯一的專屬英文/數字查詢代碼。家長和學生僅能憑此代碼查詢自己孩子的紀錄，防範個資在網路上外洩。您可以直接在表格中點選修改姓名，或利用「批次貼上」快速匯入。
+          </div>
+
+          <!-- 座號 1 ~ 35 名冊表格 -->
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>座號</th>
+                  <th>學生姓名 (直接點擊修改)</th>
+                  <th>學生專屬線上查詢代碼</th>
+                  <th>在籍狀態</th>
+                </tr>
+              </thead>
+              <tbody id="studentRosterTableBody">
+                <!-- 由 app.js 動態渲染 1~35 號 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ------------------------------------------------------------------
+           分頁 5：常規項目自訂 (Custom Routine Items)
+           ------------------------------------------------------------------ -->
+      <div id="tabPane-routine-items" class="tab-pane" style="display: none;">
+        <div class="grid-2col">
+          
+          <!-- 缺點項目清單 -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title" style="color: var(--danger-700);">
+                <span>🔴 缺點登記項目清單</span>
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="openAddItemModal('demerit')">
+                + 新增缺點項目
+              </button>
+            </div>
+            <div id="routineDemeritsList">
+              <!-- 由 app.js 動態渲染 -->
+            </div>
+          </div>
+
+          <!-- 優點項目清單 -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title" style="color: var(--success-700);">
+                <span>🟢 優點表揚項目清單</span>
+              </div>
+              <button class="btn btn-success btn-sm" onclick="openAddItemModal('merit')">
+                + 新增優點項目
+              </button>
+            </div>
+            <div id="routineMeritsList">
+              <!-- 由 app.js 動態渲染 -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ------------------------------------------------------------------
+           分頁 6：段考週期設定 (Exam Periods)
+           ------------------------------------------------------------------ -->
+      <div id="tabPane-periods" class="tab-pane" style="display: none;">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>📅 段考週期與歸零重新計算管理</span>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openAddPeriodModal()">
+              + 新增段考區間
+            </button>
+          </div>
+
+          <div style="background: var(--slate-100); border-radius: var(--radius-md); padding: 0.85rem 1rem; margin-bottom: 1.25rem; font-size: 0.85rem; color: var(--slate-700);">
+            📌 <strong>段考機制說明：</strong>
+            每次段考結束後，導師可切換至下一次段考，學生的常規優缺點次數將<strong>歸零重新累積</strong>（一次段考約 1 個月）。
+            過去段考的歷史紀錄仍會永久保存，導師隨時可以切換查閱或匯出。
+          </div>
+
+          <div id="periodsListContainer">
+            <!-- 由 app.js 動態渲染 -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ====================================================================
+         VIEW 2: 學生/家長查詢專區 (STUDENT / PARENT PORTAL)
+         ==================================================================== -->
+    <div id="studentView" style="display: none;">
+      <div class="student-portal-wrapper">
+        
+        <!-- 登入查詢卡片 -->
+        <div class="lookup-card" id="studentPortalLogin">
+          <div class="lookup-badge">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            學生與家長常規專屬查詢
+          </div>
+          <h2 style="font-size: 1.75rem; font-weight: 800; color: var(--slate-900); margin-bottom: 0.5rem;">
+            學生生活常規歷程查詢
+          </h2>
+          <p style="color: var(--slate-500); font-size: 0.92rem; max-width: 480px; margin: 0 auto;">
+            為了保護學生隱私與個人資料安全，請輸入導師發給同學的「專屬查詢代碼」，即可查看本段考的優缺點紀錄與違規明細。
+          </p>
+
+          <form onsubmit="queryStudentByCode(event)">
+            <div class="code-input-container">
+              <input type="text" id="studentCodeInput" class="code-input" placeholder="例：801-K8P2" maxlength="15" autocomplete="off" required>
+              <button type="submit" class="btn btn-primary" style="padding: 0.75rem 1.5rem; font-size: 1rem;">
+                查詢
+              </button>
+            </div>
+            <div style="font-size: 0.78rem; color: var(--slate-400); margin-top: 0.75rem;">
+              ※ 若遺失查詢代碼，請向班級導師洽詢補發代碼小卡。
+            </div>
+            <div style="margin-top: 1.25rem; text-align: center;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="switchRole('landing')">
+                🏠 返回身分選擇
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- 查詢結果專區 (登入成功後顯示) -->
+        <div id="studentPortalResult" style="display: none;">
+          
+          <div class="student-report-card">
+            <!-- 學生卡片抬頭 -->
+            <div class="student-report-header">
+              <div class="student-meta-row">
+                <div id="portalStudentHeaderInfo">
+                  <!-- 由 app.js 動態渲染 -->
+                </div>
+                <div style="display: flex; gap: 6px;">
+                  <button class="btn btn-outline btn-sm" onclick="logoutStudentPortal()" style="background: rgba(255,255,255,0.15); color: white; border-color: rgba(255,255,255,0.3);">
+                    登出查詢
+                  </button>
+                  <button class="btn btn-outline btn-sm" onclick="switchRole('landing')" style="background: rgba(255,255,255,0.15); color: white; border-color: rgba(255,255,255,0.3);">
+                    🏠 返回首頁
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 警告提醒橫幅 (若滿15次或接近15次) -->
+            <div id="portalWarningAlertBanner" style="display: none; margin: 1.5rem 1.5rem 0 1.5rem;">
+              <!-- 由 app.js 動態渲染 -->
+            </div>
+
+            <!-- 數據指標卡片 (無功過相抵) -->
+            <div class="student-stat-cards">
+              <div class="stat-box demerit">
+                <div class="stat-box-title">目前段考缺點累積</div>
+                <div class="stat-box-num" id="portalDemeritCount">0</div>
+                <div style="font-size: 0.75rem; color: var(--slate-500); margin-top: 4px;">無功過相抵機制</div>
+              </div>
+              <div class="stat-box merit">
+                <div class="stat-box-title">目前段考優點表揚</div>
+                <div class="stat-box-num" id="portalMeritCount">0</div>
+                <div style="font-size: 0.75rem; color: var(--slate-500); margin-top: 4px;">品德與生活優良</div>
+              </div>
+              <div class="stat-box alert">
+                <div class="stat-box-title" id="portalStatThresholdTitle">距離警告處分門檻</div>
+                <div class="stat-box-num" id="portalRemainingCount">0</div>
+                <div style="font-size: 0.75rem; color: var(--slate-500); margin-top: 4px;">次後送生教組</div>
+              </div>
+            </div>
+
+            <!-- 詳細常規流水帳清單 -->
+            <div style="padding: 1.5rem 1.5rem 0.5rem 1.5rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--slate-900);">
+                📋 本段考常規登記詳細明細
+              </h3>
+            </div>
+            <div class="timeline-list" id="portalHistoryList">
+              <!-- 由 app.js 動態渲染 -->
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         VIEW 3: 系統管理中心 (ADMIN CONSOLE)
+         ==================================================================== -->
+    <div id="adminView" style="display: none;">
+      
+      <!-- 管理中心頂部橫幅 -->
+      <div class="admin-header-banner">
+        <div class="admin-banner-info">
+          <div class="admin-banner-badge">系統管理員模式 (Super Administrator)</div>
+          <h2>校務常規系統管理中心</h2>
+          <p>集中管理全校所有導師班級、批次設定基本資料、學生名冊、全域校規常規與系統備份維護</p>
+        </div>
+        <div class="admin-banner-actions">
+          <button class="btn btn-outline btn-sm" onclick="exportAllDataBackup()" style="background: rgba(255,255,255,0.15); color: white; border-color: rgba(255,255,255,0.3);">
+            📥 下載全校備份 (JSON)
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="logoutAdmin()">
+            🚪 登出管理員
+          </button>
+        </div>
+      </div>
+
+      <!-- 全校統計指標卡片 -->
+      <div class="admin-stats-grid" id="adminStatsGridContainer">
+        <!-- 由 app.js 動態渲染 -->
+      </div>
+
+      <!-- 管理者子分頁選單 -->
+      <nav class="sub-nav admin-sub-nav">
+        <button class="sub-nav-item active" data-admintab="classes" onclick="switchAdminTab('classes')">
+          <span>🏫 班級與老師總管</span>
+        </button>
+        <button class="sub-nav-item" data-admintab="students" onclick="switchAdminTab('students')">
+          <span>👥 各班學生名冊與代碼</span>
+        </button>
+        <button class="sub-nav-item" data-admintab="routine-items" onclick="switchAdminTab('routine-items')">
+          <span>⚙️ 常規項目與全域同步</span>
+        </button>
+        <button class="sub-nav-item" data-admintab="periods" onclick="switchAdminTab('periods')">
+          <span>📅 各班段考週期設定</span>
+        </button>
+        <button class="sub-nav-item" data-admintab="security" onclick="switchAdminTab('security')">
+          <span>🔐 管理員安全密碼與維護</span>
+        </button>
+      </nav>
+
+      <!-- Admin Tab 1: 班級與老師總管 -->
+      <div id="adminTabPane-classes" class="tab-pane active">
+        <!-- 由 app.js 動態渲染 -->
+      </div>
+
+      <!-- Admin Tab 2: 各班學生名冊與代碼 -->
+      <div id="adminTabPane-students" class="tab-pane" style="display: none;">
+        <!-- 由 app.js 動態渲染 -->
+      </div>
+
+      <!-- Admin Tab 3: 常規項目與全域同步 -->
+      <div id="adminTabPane-routine-items" class="tab-pane" style="display: none;">
+        <!-- 由 app.js 動態渲染 -->
+      </div>
+
+      <!-- Admin Tab 4: 各班段考週期設定 -->
+      <div id="adminTabPane-periods" class="tab-pane" style="display: none;">
+        <!-- 由 app.js 動態渲染 -->
+      </div>
+
+      <!-- Admin Tab 5: 管理員安全密碼與維護 -->
+      <div id="adminTabPane-security" class="tab-pane" style="display: none;">
+        <!-- 由 app.js 動態渲染 -->
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ======================================================================
+       MODAL: Google 試算表雲端資料庫同步 (Google Sheets & Apps Script Sync)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="cloudSyncModal">
+    <div class="modal-content" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3 class="modal-title">☁️ Google 試算表雲端同步與設定</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- 說明橫幅 -->
+        <div class="cloud-sync-banner">
+          <div class="cloud-banner-icon">📊</div>
+          <div>
+            <div style="font-weight: 700; color: var(--slate-800); margin-bottom: 2px;">
+              串接 Google 試算表 (Google Sheets) 雲端資料庫
+            </div>
+            <div style="font-size: 0.8rem; color: var(--slate-600); line-height: 1.45;">
+              透過 Google Apps Script 免費後端，將全校常規紀錄流水帳、學生名冊與自訂項目同步至您的雲端試算表。
+            </div>
+          </div>
+        </div>
+
+        <!-- 網址設定輸入框 -->
+        <div class="form-group" style="margin-top: 1rem;">
+          <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Google Apps Script 網頁應用程式網址 (Web App URL)</span>
+            <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 600;">※ 依 README.md 教學取得</span>
+          </label>
+          <input type="url" id="gasApiUrlInput" class="input-text" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="font-family: monospace; font-size: 0.82rem;">
+          <div style="font-size: 0.75rem; color: var(--slate-500); margin-top: 4px;">
+            提示：部屬時權限須設為「任何人 (Anyone)」，網址格式以 <code>https://script.google.com/macros/s/.../exec</code> 結尾
+          </div>
+        </div>
+
+        <!-- 自動同步開關 -->
+        <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <div style="font-weight: 700; font-size: 0.85rem; color: var(--slate-800);">⚡ 自動背景同步 (Auto-Sync)</div>
+            <div style="font-size: 0.75rem; color: var(--slate-500);">日常登記、修改名冊或項目時，自動非同步推送到 Google 試算表</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autoCloudSyncCheckbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- 狀態資訊 -->
+        <div id="cloudSyncStatusPanel" class="cloud-status-panel">
+          <div style="font-size: 0.82rem; color: var(--slate-700); margin-bottom: 3px;">
+            <strong>目前連線狀態：</strong><span id="cloudStatusLabel">⚪ 尚未設定 (離線模式)</span>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--slate-500);">
+            <strong>上次同步時間：</strong><span id="cloudLastSyncTime">無</span>
+          </div>
+        </div>
+
+        <!-- 操作按鈕群 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+          <button type="button" class="btn btn-outline" onclick="testCloudConnection()" id="btnTestCloudConn">
+            🔌 測試連線
+          </button>
+          <button type="button" class="btn btn-primary" onclick="saveCloudSettings()">
+            💾 儲存網址設定
+          </button>
+        </div>
+
+        <div style="border-top: 1px solid var(--slate-200); margin-top: 1.25rem; padding-top: 1rem;">
+          <div style="font-weight: 700; font-size: 0.85rem; color: var(--slate-800); margin-bottom: 0.5rem;">
+            手動同步操作
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <button type="button" class="btn btn-outline" onclick="uploadToCloud()" id="btnUploadCloud" style="color: var(--primary-700); border-color: var(--primary-300);">
+              ⬆️ 立即上傳備份至試算表
+            </button>
+            <button type="button" class="btn btn-outline" onclick="downloadFromCloud()" id="btnDownloadCloud" style="color: var(--success-700); border-color: var(--success-300);">
+              ⬇️ 從試算表下載覆蓋
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllModals()">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 1: 班級管理與資料庫切換 (Class Manager & Multi-Teacher)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="classManagerModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">🏫 班級資料庫管理 (多老師/多班級支援)</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; color: var(--slate-700);">班級清單 (每班上限 35 人)</span>
+          <button class="btn btn-primary btn-sm" onclick="createNewClassPrompt()">+ 新增班級</button>
+        </div>
+        <div id="classListContainer">
+          <!-- 由 app.js 動態渲染 -->
+        </div>
+
+        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--slate-200);">
+          <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--slate-800);">
+            💾 系統資料庫備份與還原
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn btn-outline btn-sm" onclick="openCloudSyncModal()" style="color: var(--primary-700); border-color: var(--primary-300); font-weight: 700;">
+              ☁️ Google 試算表雲端同步
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="exportAllDataBackup()">
+              📥 下載全系統備份 (JSON)
+            </button>
+            <label class="btn btn-outline btn-sm" style="margin-bottom: 0; cursor: pointer;">
+              📤 匯入還原備份
+              <input type="file" accept=".json" onchange="importDataBackup(event)" style="display: none;">
+            </label>
+            <button class="btn btn-outline btn-sm" onclick="resetToPresetSampleData()" style="color: var(--danger-600);">
+              🔄 重設示範資料
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllModals()">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 2: 批次貼上學生姓名 (Batch Paste Students)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="batchPasteModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">📋 批次貼上學生姓名 (依座號 1 ~ 35 號)</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--slate-600); margin-bottom: 0.75rem;">
+          您可以直接從 Excel 或學籍系統複製學生名冊貼在下方（一行一位同學，支援直接貼姓名或「座號 姓名」格式）：
+        </p>
+        <textarea id="batchPasteInput" class="input-text" rows="12" placeholder="例：
+1 陳冠宇
+2 林子豪
+3 張祐誠
+...或直接每行純姓名"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllModals()">取消</button>
+        <button class="btn btn-primary" onclick="submitBatchPasteStudents()">確定匯入名冊</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 3: 列印家長代碼通知小卡 (Print Slips)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="printSlipsModal">
+    <div class="modal-content" style="max-width: 850px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🖨️ 學生專屬代碼家長通知單 (可直接列印裁切發給家長)</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 1rem; text-align: right;" class="no-print">
+          <button class="btn btn-primary" onclick="window.print()">🖨️ 立即列印通知單 (A4紙張排版)</button>
+        </div>
+        <div class="print-card-grid" id="printSlipsContainer">
+          <!-- 由 app.js 動態渲染 35 張裁切小卡 -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllModals()">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 4: 自訂常規項目表單 (Add/Edit Routine Item)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="routineItemModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="itemModalTitle">新增常規項目</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="itemFormType" value="demerit">
+        <input type="hidden" id="itemFormId" value="">
+
+        <div class="form-group">
+          <label class="form-label">項目名稱 *</label>
+          <input type="text" id="itemFormName" class="input-text" placeholder="例：上課擅自走動、打掃認真負責..." required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">項目分類標籤</label>
+          <input type="text" id="itemFormCategory" class="input-text" placeholder="例：課堂秩序、學業常規、生活衛生、品德態度">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">預設登記次數</label>
+          <input type="number" id="itemFormDefaultCount" class="input-text" value="1" min="1" max="10">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllModals()">取消</button>
+        <button class="btn btn-primary" onclick="saveRoutineItemForm()">儲存項目</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 5: 段考區間編輯表單 (Period Modal)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="periodModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">📅 段考區間設定</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="periodFormId" value="">
+
+        <div class="form-group">
+          <label class="form-label">段考名稱 *</label>
+          <input type="text" id="periodFormName" class="input-text" placeholder="例：115-1 第2次段考" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label class="form-label">開始日期</label>
+            <input type="date" id="periodFormStart" class="input-date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">結束日期</label>
+            <input type="date" id="periodFormEnd" class="input-date">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">備註說明</label>
+          <input type="text" id="periodFormNote" class="input-text" placeholder="例：第二次段考常規歸零重新計算">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllModals()">取消</button>
+        <button class="btn btn-primary" onclick="savePeriodForm()">儲存段考</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 6: 生教組警告單處置與列印陳報表 (Disciplinary Notice Modal)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="disciplinaryNoticeModal">
+    <div class="modal-content" style="max-width: 750px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📄 學生滿15次缺點 - 生教組警告處分陳報表</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body" id="noticeModalBody">
+        <!-- 由 app.js 動態渲染公文格式 -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllModals()">關閉</button>
+        <button class="btn btn-danger" onclick="printDisciplinaryNotice()">🖨️ 列印陳報單 (送生教組)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 7: 學生個人完整流水帳 Modal (Student Detail Modal)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="studentDetailModal">
+    <div class="modal-content" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="studentDetailModalTitle">學生常規紀錄明細</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body" id="studentDetailModalBody">
+        <!-- 由 app.js 動態渲染 -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllModals()">關閉</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 8: 校務管理者身分認證 (Admin Login Modal)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="adminLoginModal">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔐 校務管理者身分認證</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <form onsubmit="submitAdminLogin(event)">
+        <div class="modal-body">
+          <p style="font-size: 0.9rem; color: var(--slate-600); margin-bottom: 1.25rem;">
+            此專區僅供校務系統管理者進入，可為全校老師進行工作台維護、專屬密碼核發及基本資料設定。
+          </p>
+          <div class="form-group">
+            <label class="form-label">管理者專屬密碼 *</label>
+            <div style="position: relative;">
+              <input type="password" id="adminPasswordInput" class="input-text" placeholder="請輸入管理者專屬密碼" required autofocus style="padding-right: 40px;">
+              <button type="button" onclick="togglePasswordVisibility('adminPasswordInput')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--slate-400); font-size: 1rem;" title="顯示/隱藏密碼">👁️</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeAllModals()">取消</button>
+          <button type="submit" class="btn btn-primary">確認登入</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 9: 管理者編輯班級與導師基本資料 (Admin Class Edit Modal)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="adminClassEditModal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="adminClassEditModalTitle">✏️ 編輯班級與導師基本資料</h3>
+        <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
+      </div>
+      <form onsubmit="saveAdminClassEdit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="adminEditClassId">
+          <div class="form-group">
+            <label class="form-label">學校名稱</label>
+            <input type="text" id="adminEditClassSchool" class="input-text" placeholder="例：智慧國中 或 留空">
+          </div>
+          <div class="form-group">
+            <label class="form-label">班級名稱 *</label>
+            <input type="text" id="adminEditClassName" class="input-text" placeholder="例：8年1班、705班" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">導師姓名 *</label>
+            <input type="text" id="adminEditClassTeacher" class="input-text" placeholder="例：林導師、張老師" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">導師專屬登入密碼 *</label>
+            <div style="position: relative;">
+              <input type="text" id="adminEditClassTeacherPassword" class="input-text" placeholder="例：tea801" required style="padding-right: 70px; font-weight: 700; font-family: monospace;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="adminGenerateRandomTeacherPasswordForEdit()" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); padding: 3px 8px; font-size: 0.75rem;">
+                🎲 隨機
+              </button>
+            </div>
+            <span style="font-size: 0.75rem; color: var(--slate-500);">導師在首頁輸入此密碼登入班級工作台，統一由管理員設定與修改</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">缺點警告處分門檻 (次數) *</label>
+            <input type="number" id="adminEditClassWarningThreshold" class="input-text" min="1" max="100" value="15" required>
+            <span style="font-size: 0.75rem; color: var(--slate-500);">累積缺點達到此上限次數將列入警告名單</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">班級學生上限人數</label>
+            <input type="number" id="adminEditClassCapacity" class="input-text" min="1" max="45" value="35" required>
+            <span style="font-size: 0.75rem; color: var(--slate-500);">國中日常常規經營建議標準上限為 35 人</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeAllModals()">取消</button>
+          <button type="submit" class="btn btn-primary">儲存設定</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- PWA 安裝說明互動視窗 (Install Modal) -->
+  <div class="modal-backdrop" id="pwaInstallModal">
+    <div class="modal-card" style="max-width: 580px;">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span style="font-size: 1.5rem;">📲</span>
+          <div>
+            <h3 class="modal-title">安裝此系統至手機或電腦</h3>
+            <p class="modal-subtitle">無需經過 App 商店審查，一鍵加入桌面，享受全螢幕原生 App 體驗！</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close" onclick="closeAllModals()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1.25rem 1.5rem;">
+        <div class="pwa-install-guide-grid">
+          <!-- 蘋果 iOS / iPadOS -->
+          <div class="install-card-step">
+            <div class="install-step-header">
+              <span class="step-badge-apple">🍎 iPhone / iPad</span>
+            </div>
+            <ol class="install-steps-list">
+              <li>以 <strong>Safari 瀏覽器</strong> 開啟本系統網址</li>
+              <li>點擊螢幕下方（或上方）的 <strong>分享按鈕</strong> <span style="display:inline-block; border:1px solid #cbd5e1; border-radius:4px; padding:1px 6px; font-size:0.8rem; background:#f8fafc;">􀈂 分享</span></li>
+              <li>在選單中向下滑動，點選 <strong>「加入主畫面」</strong> ➔ 按下右上角「新增」</li>
+              <li>手機桌面即可看到專屬 <strong>「培英優缺點」App 圖示</strong>，點開即是全螢幕！</li>
+            </ol>
+          </div>
+
+          <!-- 安卓 Android -->
+          <div class="install-card-step">
+            <div class="install-step-header">
+              <span class="step-badge-android">🤖 Android 手機 / 平板</span>
+            </div>
+            <ol class="install-steps-list">
+              <li>以 <strong>Chrome 瀏覽器</strong> 開啟本系統網址</li>
+              <li>點擊網址列右上方 <strong>三點選單（⋮）</strong></li>
+              <li>點選 <strong>「安裝應用程式」</strong> 或 <strong>「加到主螢幕」</strong></li>
+              <li>確認安裝後，桌面將自動生成 App 圖示，支援離線開啟！</li>
+            </ol>
+          </div>
+
+          <!-- 電腦 Windows / Mac / Chromebook -->
+          <div class="install-card-step">
+            <div class="install-step-header">
+              <span class="step-badge-pc">💻 電腦 (Windows / Mac)</span>
+            </div>
+            <ol class="install-steps-list">
+              <li>以 <strong>Chrome 或 Edge 瀏覽器</strong> 開啟本網址</li>
+              <li>在上方網址列最右側，會看見 <strong>「安裝應用程式」電腦小圖示</strong>（或點右上角「…」➔「應用程式」➔「安裝此網站為應用程式」）</li>
+              <li>點擊「安裝」後，電腦桌面和開始功能表會自動建立捷徑，擁有獨立視窗！</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <span style="font-size: 0.8rem; color: var(--slate-500);">💡 安裝後離線亦可操作登記，連網時自動同步更新</span>
+        <button type="button" class="btn btn-primary" onclick="closeAllModals()">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="sampleData.js"></script>
+  <script src="app.js"></script>
+
+  <!-- PWA Service Worker 與安裝事件監聽 -->
+  <script>
+    let deferredPwaPrompt = null;
+
+    // 監聽瀏覽器 PWA 可安裝事件 (Chrome / Edge / Android)
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPwaPrompt = e;
+      const btn = document.getElementById('btnInstallApp');
+      if (btn) {
+        btn.classList.add('can-install-prompt');
+        btn.querySelector('.install-text').innerHTML = '<strong>⚡ 立即一鍵安裝此系統到本機</strong>（點擊直接安裝）';
+      }
+    });
+
+    // 點擊安裝按鈕觸發
+    function handlePwaInstallClick() {
+      if (deferredPwaPrompt) {
+        deferredPwaPrompt.prompt();
+        deferredPwaPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('使用者接受安裝 PWA');
+            if (typeof showToast === 'function') {
+              showToast('恭喜！系統已成功安裝到您的桌面/主畫面', 'success');
+            }
+          }
+          deferredPwaPrompt = null;
+        });
+      } else {
+        // 若在 iOS Safari 或尚未觸發 prompt，彈出清晰的圖文安裝指引
+        const modal = document.getElementById('pwaInstallModal');
+        if (modal) modal.classList.add('open');
+      }
+    }
+
+    // 監聽是否已安裝成功
+    window.addEventListener('appinstalled', () => {
+      console.log('PWA 已成功安裝');
+      deferredPwaPrompt = null;
+      const btn = document.getElementById('btnInstallApp');
+      if (btn) {
+        btn.querySelector('.install-text').innerHTML = '<strong>✅ 本系統已成功安裝為本機應用</strong>';
+        btn.style.opacity = '0.85';
+      }
+    });
+
+    // 註冊 Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('PWA ServiceWorker 註冊成功，範圍:', reg.scope))
+          .catch((err) => console.warn('PWA ServiceWorker 未能註冊 (可能為本地檔案預覽):', err));
+      });
+    }
+  </script>
+</body>
+</html>

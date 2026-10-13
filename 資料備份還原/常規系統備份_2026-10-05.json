@@ -1,0 +1,932 @@
+{
+  "adminPassword": "admin1234",
+  "currentClassId": "class-801",
+  "classes": [
+    {
+      "id": "class-801",
+      "name": "703",
+      "school": "",
+      "teacherName": "黃老師",
+      "maxCapacity": 27,
+      "createdAt": "2026-09-01",
+      "currentExamPeriodId": "period-1",
+      "examPeriods": [
+        {
+          "id": "period-1",
+          "name": "115-1 第1次段考",
+          "startDate": "2026-09-01",
+          "endDate": "2026-10-15",
+          "isCurrent": true,
+          "note": "學期初至第一次段考常規統計"
+        },
+        {
+          "id": "period-2",
+          "name": "115-1 第2次段考",
+          "startDate": "2026-10-16",
+          "endDate": "2026-11-27",
+          "isCurrent": false,
+          "note": "第2次段考常規統計 (歸零重新計算)"
+        },
+        {
+          "id": "period-3",
+          "name": "115-1 第3次段考",
+          "startDate": "2026-11-28",
+          "endDate": "2027-01-18",
+          "isCurrent": false,
+          "note": "學期末至第三次段考常規統計"
+        }
+      ],
+      "routineItems": {
+        "demerits": [
+          {
+            "id": "d-1",
+            "name": "遲到進教室",
+            "category": "出缺席",
+            "defaultCount": 1,
+            "icon": "alarm"
+          },
+          {
+            "id": "d-2",
+            "name": "未交作業 / 遲交",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "book-x"
+          },
+          {
+            "id": "d-3",
+            "name": "聯絡簿未簽 / 未帶",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "file-x"
+          },
+          {
+            "id": "d-4",
+            "name": "上課擅自說話喧嘩",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "volume-2"
+          },
+          {
+            "id": "d-5",
+            "name": "上課趴睡未聽講",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "moon"
+          },
+          {
+            "id": "d-6",
+            "name": "服裝儀容不整",
+            "category": "生活常規",
+            "defaultCount": 1,
+            "icon": "shirt"
+          },
+          {
+            "id": "d-7",
+            "name": "打掃工作未到 / 偷懶",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "brush"
+          },
+          {
+            "id": "d-8",
+            "name": "座位週遭髒亂遺留垃圾",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "trash-2"
+          },
+          {
+            "id": "d-9",
+            "name": "下課走廊奔跑追逐",
+            "category": "校園安全",
+            "defaultCount": 1,
+            "icon": "zap"
+          },
+          {
+            "id": "d-10",
+            "name": "對師長同學態度不佳",
+            "category": "品德態度",
+            "defaultCount": 1,
+            "icon": "alert-circle"
+          }
+        ],
+        "merits": [
+          {
+            "id": "m-1",
+            "name": "熱心助人 / 協助公務",
+            "category": "品德實踐",
+            "defaultCount": 1,
+            "icon": "heart-handshake"
+          },
+          {
+            "id": "m-2",
+            "name": "打掃認真負責 / 獲表揚",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "sparkles"
+          },
+          {
+            "id": "m-3",
+            "name": "課堂主動發言表現優良",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "star"
+          },
+          {
+            "id": "m-4",
+            "name": "作業整潔優良獲甲上",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "award"
+          },
+          {
+            "id": "m-5",
+            "name": "拾金不昧",
+            "category": "品德實踐",
+            "defaultCount": 1,
+            "icon": "gift"
+          },
+          {
+            "id": "m-6",
+            "name": "擔任幹部盡忠職守",
+            "category": "幹部表現",
+            "defaultCount": 1,
+            "icon": "shield-check"
+          },
+          {
+            "id": "m-7",
+            "name": "主動維護班級公共秩序",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "thumbs-up"
+          }
+        ]
+      },
+      "students": [
+        {
+          "id": "s-1",
+          "seatNumber": 1,
+          "name": "朱峻賢",
+          "code": "703-2AJF"
+        },
+        {
+          "id": "s-2",
+          "seatNumber": 2,
+          "name": "呂浩辰",
+          "code": "703-DASU"
+        },
+        {
+          "id": "s-3",
+          "seatNumber": 3,
+          "name": "汪奕宏",
+          "code": "703-97YC"
+        },
+        {
+          "id": "s-4",
+          "seatNumber": 4,
+          "name": "林士哲",
+          "code": "703-QLWP"
+        },
+        {
+          "id": "s-5",
+          "seatNumber": 5,
+          "name": "孫恩禹",
+          "code": "703-XHHA"
+        },
+        {
+          "id": "s-6",
+          "seatNumber": 6,
+          "name": "張稟杰",
+          "code": "703-TKL5"
+        },
+        {
+          "id": "s-7",
+          "seatNumber": 7,
+          "name": "許祐愷",
+          "code": "703-BTZT"
+        },
+        {
+          "id": "s-8",
+          "seatNumber": 8,
+          "name": "陳柏郡",
+          "code": "703-V5ZG"
+        },
+        {
+          "id": "s-10",
+          "seatNumber": 10,
+          "name": "楊宸源",
+          "code": "703-PGJB"
+        },
+        {
+          "id": "s-11",
+          "seatNumber": 11,
+          "name": "楊凱舜",
+          "code": "703-HHF4"
+        },
+        {
+          "id": "s-12",
+          "seatNumber": 12,
+          "name": "蔡其侑",
+          "code": "703-JMBY"
+        },
+        {
+          "id": "s-13",
+          "seatNumber": 13,
+          "name": "蔡秉宸",
+          "code": "703-NFKB"
+        },
+        {
+          "id": "s-14",
+          "seatNumber": 14,
+          "name": "賴律銜",
+          "code": "703-JP9D"
+        },
+        {
+          "id": "s-15",
+          "seatNumber": 15,
+          "name": "爐堃睿",
+          "code": "703-LJ32"
+        },
+        {
+          "id": "s-21",
+          "seatNumber": 21,
+          "name": "王貝兒",
+          "code": "703-X4KS"
+        },
+        {
+          "id": "s-22",
+          "seatNumber": 22,
+          "name": "古彩妤",
+          "code": "703-444M"
+        },
+        {
+          "id": "s-23",
+          "seatNumber": 23,
+          "name": "邱子寧",
+          "code": "703-P2FC"
+        },
+        {
+          "id": "s-24",
+          "seatNumber": 24,
+          "name": "殷乙有",
+          "code": "703-DRGL"
+        },
+        {
+          "id": "s-25",
+          "seatNumber": 25,
+          "name": "張瑜希",
+          "code": "703-T6H6"
+        },
+        {
+          "id": "s-26",
+          "seatNumber": 26,
+          "name": "曹晴媗",
+          "code": "703-ETQ9"
+        },
+        {
+          "id": "s-27",
+          "seatNumber": 27,
+          "name": "莊芯宇",
+          "code": "703-K4WG"
+        },
+        {
+          "id": "s-28",
+          "seatNumber": 28,
+          "name": "陳思瑜",
+          "code": "703-3Z4J"
+        },
+        {
+          "id": "s-29",
+          "seatNumber": 29,
+          "name": "楊詠琁",
+          "code": "703-QQTY"
+        },
+        {
+          "id": "s-30",
+          "seatNumber": 30,
+          "name": "葉羽恩",
+          "code": "703-6DH2"
+        },
+        {
+          "id": "s-31",
+          "seatNumber": 31,
+          "name": "盧青妘",
+          "code": "703-T27L"
+        },
+        {
+          "id": "s-32",
+          "seatNumber": 32,
+          "name": "閻晨熙",
+          "code": "703-JVM7"
+        },
+        {
+          "id": "s-33",
+          "seatNumber": 33,
+          "name": "鍾可恩",
+          "code": "703-3H5X"
+        }
+      ],
+      "records": [],
+      "teacherPassword": "1151703",
+      "warningThreshold": 15
+    },
+    {
+      "id": "class-705",
+      "name": "705",
+      "school": "",
+      "teacherName": "楊老師",
+      "maxCapacity": 30,
+      "createdAt": "2026-09-01",
+      "currentExamPeriodId": "p705-1",
+      "examPeriods": [
+        {
+          "id": "p705-1",
+          "name": "115-1 第1次段考",
+          "startDate": "2026-09-01",
+          "endDate": "2026-10-15",
+          "isCurrent": true,
+          "note": "新生第一次段考"
+        }
+      ],
+      "routineItems": {
+        "demerits": [
+          {
+            "id": "d7-1",
+            "name": "遲到進教室",
+            "category": "常規",
+            "defaultCount": 1,
+            "icon": "alarm"
+          },
+          {
+            "id": "d7-2",
+            "name": "缺交作業",
+            "category": "學業",
+            "defaultCount": 1,
+            "icon": "book-x"
+          },
+          {
+            "id": "d7-3",
+            "name": "打掃偷懶",
+            "category": "生活",
+            "defaultCount": 1,
+            "icon": "brush"
+          }
+        ],
+        "merits": [
+          {
+            "id": "m7-1",
+            "name": "主動助人",
+            "category": "品德",
+            "defaultCount": 1,
+            "icon": "heart-handshake"
+          },
+          {
+            "id": "m7-2",
+            "name": "打掃認真",
+            "category": "生活",
+            "defaultCount": 1,
+            "icon": "sparkles"
+          }
+        ]
+      },
+      "students": [
+        {
+          "id": "s7-1",
+          "seatNumber": 1,
+          "name": "王小明",
+          "code": "705-R5D8"
+        },
+        {
+          "id": "s7-2",
+          "seatNumber": 2,
+          "name": "李小美",
+          "code": "705-DY9M"
+        },
+        {
+          "id": "s7-3",
+          "seatNumber": 3,
+          "name": "張大華",
+          "code": "705-L38D"
+        }
+      ],
+      "records": [],
+      "teacherPassword": "1151705",
+      "warningThreshold": 10
+    },
+    {
+      "id": "class-muvfouzi-6c9ro",
+      "name": "706",
+      "school": "",
+      "teacherName": "張簡老師",
+      "teacherPassword": "1151706",
+      "warningThreshold": 15,
+      "maxCapacity": 35,
+      "createdAt": "2026-10-05",
+      "currentExamPeriodId": "p1",
+      "examPeriods": [
+        {
+          "id": "p1",
+          "name": "115-1 第1次段考",
+          "startDate": "2026-10-05",
+          "endDate": "",
+          "isCurrent": true,
+          "note": "初次段考"
+        },
+        {
+          "id": "p2",
+          "name": "115-1 第2次段考",
+          "startDate": "",
+          "endDate": "",
+          "isCurrent": false,
+          "note": "第2次段考"
+        }
+      ],
+      "routineItems": {
+        "demerits": [
+          {
+            "id": "d-muvfouzi-3gbb6",
+            "name": "遲到進教室",
+            "category": "出缺席",
+            "defaultCount": 1,
+            "icon": "alarm"
+          },
+          {
+            "id": "d-muvfouzi-zwmo3",
+            "name": "未交作業 / 遲交",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "book-x"
+          },
+          {
+            "id": "d-muvfouzi-k0sw8",
+            "name": "上課擅自說話喧嘩",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "volume-2"
+          },
+          {
+            "id": "d-muvfouzi-ahw6w",
+            "name": "打掃工作未到 / 偷懶",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "brush"
+          }
+        ],
+        "merits": [
+          {
+            "id": "m-muvfouzi-52oyv",
+            "name": "熱心助人 / 協助公務",
+            "category": "品德實踐",
+            "defaultCount": 1,
+            "icon": "heart-handshake"
+          },
+          {
+            "id": "m-muvfouzi-ymqmg",
+            "name": "打掃認真負責 / 獲表揚",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "sparkles"
+          },
+          {
+            "id": "m-muvfouzi-pzzbs",
+            "name": "作業整潔優良獲甲上",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "award"
+          }
+        ]
+      },
+      "students": [],
+      "records": []
+    },
+    {
+      "id": "class-muvfpe7q-z8zji",
+      "name": "708",
+      "school": "",
+      "teacherName": "李老師",
+      "teacherPassword": "1151708",
+      "warningThreshold": 15,
+      "maxCapacity": 35,
+      "createdAt": "2026-10-05",
+      "currentExamPeriodId": "p1",
+      "examPeriods": [
+        {
+          "id": "p1",
+          "name": "115-1 第1次段考",
+          "startDate": "2026-10-05",
+          "endDate": "",
+          "isCurrent": true,
+          "note": "初次段考"
+        },
+        {
+          "id": "p2",
+          "name": "115-1 第2次段考",
+          "startDate": "",
+          "endDate": "",
+          "isCurrent": false,
+          "note": "第2次段考"
+        }
+      ],
+      "routineItems": {
+        "demerits": [
+          {
+            "id": "d-muvfpe7q-yr8hq",
+            "name": "遲到進教室",
+            "category": "出缺席",
+            "defaultCount": 1,
+            "icon": "alarm"
+          },
+          {
+            "id": "d-muvfpe7q-0dhp8",
+            "name": "未交作業 / 遲交",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "book-x"
+          },
+          {
+            "id": "d-muvfpe7q-5sxry",
+            "name": "上課擅自說話喧嘩",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "volume-2"
+          },
+          {
+            "id": "d-muvfpe7q-s1p2o",
+            "name": "打掃工作未到 / 偷懶",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "brush"
+          }
+        ],
+        "merits": [
+          {
+            "id": "m-muvfpe7q-y1uwi",
+            "name": "熱心助人 / 協助公務",
+            "category": "品德實踐",
+            "defaultCount": 1,
+            "icon": "heart-handshake"
+          },
+          {
+            "id": "m-muvfpe7q-cu2ml",
+            "name": "打掃認真負責 / 獲表揚",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "sparkles"
+          },
+          {
+            "id": "m-muvfpe7q-5tg45",
+            "name": "作業整潔優良獲甲上",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "award"
+          }
+        ]
+      },
+      "students": [],
+      "records": []
+    },
+    {
+      "id": "class-muvfpsu5-ou48x",
+      "name": "711",
+      "school": "",
+      "teacherName": "黃老師",
+      "teacherPassword": "1151711",
+      "warningThreshold": 15,
+      "maxCapacity": 35,
+      "createdAt": "2026-10-05",
+      "currentExamPeriodId": "p1",
+      "examPeriods": [
+        {
+          "id": "p1",
+          "name": "115-1 第1次段考",
+          "startDate": "2026-10-05",
+          "endDate": "",
+          "isCurrent": true,
+          "note": "初次段考"
+        },
+        {
+          "id": "p2",
+          "name": "115-1 第2次段考",
+          "startDate": "",
+          "endDate": "",
+          "isCurrent": false,
+          "note": "第2次段考"
+        }
+      ],
+      "routineItems": {
+        "demerits": [
+          {
+            "id": "d-muvfpsu5-j8cka",
+            "name": "遲到進教室",
+            "category": "出缺席",
+            "defaultCount": 1,
+            "icon": "alarm"
+          },
+          {
+            "id": "d-muvfpsu5-wi9gy",
+            "name": "未交作業 / 遲交",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "book-x"
+          },
+          {
+            "id": "d-muvfpsu5-qr7kj",
+            "name": "上課擅自說話喧嘩",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "volume-2"
+          },
+          {
+            "id": "d-muvfpsu5-lidmj",
+            "name": "打掃工作未到 / 偷懶",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "brush"
+          }
+        ],
+        "merits": [
+          {
+            "id": "m-muvfpsu5-rcpjx",
+            "name": "熱心助人 / 協助公務",
+            "category": "品德實踐",
+            "defaultCount": 1,
+            "icon": "heart-handshake"
+          },
+          {
+            "id": "m-muvfpsu5-1zdw4",
+            "name": "打掃認真負責 / 獲表揚",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "sparkles"
+          },
+          {
+            "id": "m-muvfpsu5-l8nr9",
+            "name": "作業整潔優良獲甲上",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "award"
+          }
+        ]
+      },
+      "students": [],
+      "records": []
+    },
+    {
+      "id": "class-muvfqejh-rdfyh",
+      "name": "723",
+      "school": "",
+      "teacherName": "曾老師",
+      "teacherPassword": "1151723",
+      "warningThreshold": 15,
+      "maxCapacity": 35,
+      "createdAt": "2026-10-05",
+      "currentExamPeriodId": "p1",
+      "examPeriods": [
+        {
+          "id": "p1",
+          "name": "115-1 第1次段考",
+          "startDate": "2026-10-05",
+          "endDate": "",
+          "isCurrent": true,
+          "note": "初次段考"
+        },
+        {
+          "id": "p2",
+          "name": "115-1 第2次段考",
+          "startDate": "",
+          "endDate": "",
+          "isCurrent": false,
+          "note": "第2次段考"
+        }
+      ],
+      "routineItems": {
+        "demerits": [
+          {
+            "id": "d-muvfqejh-x8gv5",
+            "name": "遲到進教室",
+            "category": "出缺席",
+            "defaultCount": 1,
+            "icon": "alarm"
+          },
+          {
+            "id": "d-muvfqejh-0c320",
+            "name": "未交作業 / 遲交",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "book-x"
+          },
+          {
+            "id": "d-muvfqejh-tgllp",
+            "name": "上課擅自說話喧嘩",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "volume-2"
+          },
+          {
+            "id": "d-muvfqejh-is9zg",
+            "name": "打掃工作未到 / 偷懶",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "brush"
+          }
+        ],
+        "merits": [
+          {
+            "id": "m-muvfqejh-qgcvw",
+            "name": "熱心助人 / 協助公務",
+            "category": "品德實踐",
+            "defaultCount": 1,
+            "icon": "heart-handshake"
+          },
+          {
+            "id": "m-muvfqejh-p9ij2",
+            "name": "打掃認真負責 / 獲表揚",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "sparkles"
+          },
+          {
+            "id": "m-muvfqejh-13rgy",
+            "name": "作業整潔優良獲甲上",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "award"
+          }
+        ]
+      },
+      "students": [],
+      "records": []
+    },
+    {
+      "id": "class-muvfqpgt-6vet1",
+      "name": "718",
+      "school": "",
+      "teacherName": "楊老師",
+      "teacherPassword": "1151718",
+      "warningThreshold": 15,
+      "maxCapacity": 35,
+      "createdAt": "2026-10-05",
+      "currentExamPeriodId": "p1",
+      "examPeriods": [
+        {
+          "id": "p1",
+          "name": "115-1 第1次段考",
+          "startDate": "2026-10-05",
+          "endDate": "",
+          "isCurrent": true,
+          "note": "初次段考"
+        },
+        {
+          "id": "p2",
+          "name": "115-1 第2次段考",
+          "startDate": "",
+          "endDate": "",
+          "isCurrent": false,
+          "note": "第2次段考"
+        }
+      ],
+      "routineItems": {
+        "demerits": [
+          {
+            "id": "d-muvfqpgt-xdkle",
+            "name": "遲到進教室",
+            "category": "出缺席",
+            "defaultCount": 1,
+            "icon": "alarm"
+          },
+          {
+            "id": "d-muvfqpgt-ncq8u",
+            "name": "未交作業 / 遲交",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "book-x"
+          },
+          {
+            "id": "d-muvfqpgt-urrcf",
+            "name": "上課擅自說話喧嘩",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "volume-2"
+          },
+          {
+            "id": "d-muvfqpgt-uf097",
+            "name": "打掃工作未到 / 偷懶",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "brush"
+          }
+        ],
+        "merits": [
+          {
+            "id": "m-muvfqpgt-x812d",
+            "name": "熱心助人 / 協助公務",
+            "category": "品德實踐",
+            "defaultCount": 1,
+            "icon": "heart-handshake"
+          },
+          {
+            "id": "m-muvfqpgt-3f5si",
+            "name": "打掃認真負責 / 獲表揚",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "sparkles"
+          },
+          {
+            "id": "m-muvfqpgt-pwp64",
+            "name": "作業整潔優良獲甲上",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "award"
+          }
+        ]
+      },
+      "students": [],
+      "records": []
+    },
+    {
+      "id": "class-muvfrda6-01ii2",
+      "name": "705",
+      "school": "",
+      "teacherName": "呂老師",
+      "teacherPassword": "1151705A",
+      "warningThreshold": 15,
+      "maxCapacity": 35,
+      "createdAt": "2026-10-05",
+      "currentExamPeriodId": "p1",
+      "examPeriods": [
+        {
+          "id": "p1",
+          "name": "115-1 第1次段考",
+          "startDate": "2026-10-05",
+          "endDate": "",
+          "isCurrent": true,
+          "note": "初次段考"
+        },
+        {
+          "id": "p2",
+          "name": "115-1 第2次段考",
+          "startDate": "",
+          "endDate": "",
+          "isCurrent": false,
+          "note": "第2次段考"
+        }
+      ],
+      "routineItems": {
+        "demerits": [
+          {
+            "id": "d-muvfrda6-ggn84",
+            "name": "遲到進教室",
+            "category": "出缺席",
+            "defaultCount": 1,
+            "icon": "alarm"
+          },
+          {
+            "id": "d-muvfrda6-51or5",
+            "name": "未交作業 / 遲交",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "book-x"
+          },
+          {
+            "id": "d-muvfrda6-su9fe",
+            "name": "上課擅自說話喧嘩",
+            "category": "課堂秩序",
+            "defaultCount": 1,
+            "icon": "volume-2"
+          },
+          {
+            "id": "d-muvfrda6-cji3l",
+            "name": "打掃工作未到 / 偷懶",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "brush"
+          }
+        ],
+        "merits": [
+          {
+            "id": "m-muvfrda6-c7nnk",
+            "name": "熱心助人 / 協助公務",
+            "category": "品德實踐",
+            "defaultCount": 1,
+            "icon": "heart-handshake"
+          },
+          {
+            "id": "m-muvfrda6-3fcro",
+            "name": "打掃認真負責 / 獲表揚",
+            "category": "衛生環境",
+            "defaultCount": 1,
+            "icon": "sparkles"
+          },
+          {
+            "id": "m-muvfrda6-akdzl",
+            "name": "作業整潔優良獲甲上",
+            "category": "學業常規",
+            "defaultCount": 1,
+            "icon": "award"
+          }
+        ]
+      },
+      "students": [],
+      "records": []
+    }
+  ]
+}

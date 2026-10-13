@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="50%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="50%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#0f172a" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background Card -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+
+  <!-- Inner Soft Border -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#ffffff" stroke-width="4" stroke-opacity="0.25"/>
+
+  <!-- Shield Base with Shadow -->
+  <path d="M 256,84 C 344,84 394,116 394,116 C 394,260 338,368 256,418 C 174,368 118,260 118,116 C 118,116 168,84 256,84 Z"
+        fill="url(#shieldGrad)" filter="url(#shadow)"/>
+
+  <!-- Shield Inner Border -->
+  <path d="M 256,104 C 330,104 374,132 374,132 C 374,252 326,346 256,392 C 186,346 138,252 138,132 C 138,132 182,104 256,104 Z"
+        fill="#f8fafc" stroke="#3b82f6" stroke-width="6"/>
+
+  <!-- Star at Top of Shield -->
+  <path d="M 256,140 L 263,162 L 286,162 L 267,176 L 274,198 L 256,184 L 238,198 L 245,176 L 226,162 L 249,162 Z"
+        fill="url(#goldGrad)"/>
+
+  <!-- Checkmark (Positive reinforcement / Merit) -->
+  <path d="M 190,268 L 236,314 L 328,212"
+        fill="none" stroke="#2563eb" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Text / School Emblem Monogram -->
+  <text x="256" y="360" font-family="'Noto Sans TC', 'Microsoft JhengHei', sans-serif" font-size="28" font-weight="900" fill="#1e3a8a" text-anchor="middle" letter-spacing="4">培英國中</text>
+</svg>
