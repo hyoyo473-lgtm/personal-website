@@ -118,7 +118,7 @@
             <form onsubmit="loginTeacherWithPassword(event)">
               <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.35rem;">輸入班級導師專屬密碼：</label>
               <div style="position: relative; margin-bottom: 0.75rem;">
-                <input type="password" id="landingTeacherPasswordInput" class="input-text" placeholder="請輸入導師專屬密碼" autocomplete="current-password" required style="width: 100%; padding-right: 40px; font-weight: 700; letter-spacing: 1px;">
+                <input type="password" id="landingTeacherPasswordInput" class="input-text" placeholder="請輸入導師專屬密碼" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required style="width: 100%; padding-right: 40px; font-weight: 700; letter-spacing: 1px;">
                 <button type="button" onclick="togglePasswordVisibility('landingTeacherPasswordInput')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--slate-400); font-size: 1rem;" title="顯示/隱藏密碼">👁️</button>
               </div>
               <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
@@ -145,7 +145,7 @@
             <form onsubmit="queryStudentDirectlyFromLanding(event)">
               <label class="form-label" style="font-size: 0.85rem; margin-bottom: 0.35rem;">輸入學生個人專屬代碼：</label>
               <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                <input type="text" id="landingStudentCodeInput" class="input-text" placeholder="例：801-K8P2" maxlength="15" autocomplete="off" style="font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">
+                <input type="text" id="landingStudentCodeInput" class="input-text" placeholder="例：801-K8P2" maxlength="15" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" style="font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">
                 <button type="submit" class="btn btn-success" style="white-space: nowrap; padding: 0.65rem 1.25rem;">
                   查詢 ➜
                 </button>
@@ -1031,7 +1031,7 @@
           <div class="form-group">
             <label class="form-label">管理者專屬密碼 *</label>
             <div style="position: relative;">
-              <input type="password" id="adminPasswordInput" class="input-text" placeholder="請輸入管理者專屬密碼" required autofocus style="padding-right: 40px;">
+              <input type="password" id="adminPasswordInput" class="input-text" placeholder="請輸入管理者專屬密碼" autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus style="padding-right: 40px;">
               <button type="button" onclick="togglePasswordVisibility('adminPasswordInput')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--slate-400); font-size: 1rem;" title="顯示/隱藏密碼">👁️</button>
             </div>
           </div>

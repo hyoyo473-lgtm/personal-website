@@ -74,6 +74,17 @@ function generateStudentCode(clsOrName, existingCodes = new Set()) {
   return code;
 }
 
+// 輔助函式：標準化輸入字串（全形英數符號轉半形、全形空白與破折號轉半形減號、去除不可見字元與前後空白）
+function normalizeInputString(str) {
+  if (typeof str !== "string") str = str ? String(str) : "";
+  return str
+    .replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/\u3000/g, " ")
+    .replace(/[—–－ｰ―]/g, "-")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+}
+
 // 產生唯一 ID
 function uid(prefix = "id") {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 5)}`;
@@ -374,11 +385,8 @@ function renderNavbar(cls) {
     } else if (AppState.currentRole === "admin") {
       navButtons.innerHTML = `
         <span class="badge-admin">⚙️ 系統管理員模式</span>
-        <button type="button" class="btn btn-outline btn-sm" onclick="switchRole('landing')">
-          🏠 回首頁
-        </button>
-        <button type="button" class="btn btn-danger btn-sm" onclick="logoutAdmin()">
-          🚪 登出
+        <button type="button" class="btn btn-outline btn-sm" onclick="logoutAdmin()">
+          🏠 退出管理員並回首頁
         </button>
       `;
     }
@@ -1931,6 +1939,13 @@ function switchTeacherTab(tabName) {
 
 // 切換角色 (landing | teacher | student | admin)
 function switchRole(role) {
+  // 核心安全防護：一旦離開管理員專屬後台，自動重設管理員登入身分，防止資料庫連結外洩
+  if (AppState.currentRole === "admin" && role !== "admin") {
+    AppState.isAdminLoggedIn = false;
+    AppState.isImpersonating = false;
+    sessionStorage.removeItem("ROUTINE_ADMIN_AUTH");
+  }
+
   AppState.currentRole = role;
   AppState.selectedStudentIds.clear();
   renderApp();
@@ -1945,23 +1960,38 @@ function renderLandingView() {
 }
 
 // 導師透過專屬密碼登入所屬班級
-function loginTeacherWithPassword(event) {
+async function loginTeacherWithPassword(event) {
   if (event) event.preventDefault();
   const pwInput = document.getElementById("landingTeacherPasswordInput");
-  const enteredPw = pwInput ? pwInput.value.trim() : "";
+  const enteredPw = normalizeInputString(pwInput ? pwInput.value : "");
 
   if (!enteredPw) {
     showToast("請輸入導師專屬密碼！", "warning");
     return;
   }
 
-  if (!AppState.data || !AppState.data.classes) {
-    showToast("系統資料異常，請聯繫校務管理者！", "danger");
-    return;
-  }
+  const findTeacherClass = (pw) => {
+    if (!AppState.data || !AppState.data.classes) return null;
+    const cleanPw = pw.toLowerCase();
+    return AppState.data.classes.find(c => {
+      if (!c.teacherPassword) return false;
+      const tPw = normalizeInputString(c.teacherPassword).toLowerCase();
+      return tPw === cleanPw;
+    });
+  };
 
-  // 尋找符合此專屬密碼的班級 (比對 teacherPassword)
-  const matchedClass = AppState.data.classes.find(c => c.teacherPassword && c.teacherPassword.trim().toLowerCase() === enteredPw.toLowerCase());
+  let matchedClass = findTeacherClass(enteredPw);
+
+  // 若本機查無符合班級（例如手機剛由連結開啟尚未快取雲端資料），且已設定 GAS 網址，立即向雲端同步驗證
+  const cfg = getCloudSyncConfig();
+  if (!matchedClass && cfg.gasUrl) {
+    showToast("正在連線驗證雲端班級資料庫，請稍候...", "info");
+    updateCloudSyncBadge("syncing", "驗證中...");
+    const ok = await fetchLatestDataFromCloud();
+    if (ok) {
+      matchedClass = findTeacherClass(enteredPw);
+    }
+  }
 
   if (!matchedClass) {
     showToast("密碼錯誤或查無對應班級！請向校務管理者洽詢您的導師專屬密碼。", "danger");
@@ -1990,42 +2020,54 @@ function logoutTeacher() {
   showToast("已成功登出導師工作台", "info");
 }
 
-function queryStudentDirectlyFromLanding(event) {
+async function queryStudentDirectlyFromLanding(event) {
   if (event) event.preventDefault();
   const inputEl = document.getElementById("landingStudentCodeInput");
-  const code = inputEl ? inputEl.value.trim().toUpperCase() : "";
+  const code = normalizeInputString(inputEl ? inputEl.value : "").toUpperCase();
 
   if (!code) {
     showToast("請輸入專屬查詢代碼！", "warning");
     return;
   }
 
-  let foundStudent = null;
-  let foundClass = null;
+  const findStudentByCode = (queryCode) => {
+    if (!AppState.data || !AppState.data.classes) return null;
+    for (const cls of AppState.data.classes) {
+      if (!cls.students) continue;
+      const s = cls.students.find(stu => {
+        if (!stu.code) return false;
+        return normalizeInputString(stu.code).toUpperCase() === queryCode;
+      });
+      if (s) return { student: s, classObj: cls };
+    }
+    return null;
+  };
 
-  for (const cls of AppState.data.classes) {
-    const s = cls.students.find(stu => stu.code.toUpperCase() === code);
-    if (s) {
-      foundStudent = s;
-      foundClass = cls;
-      break;
+  let found = findStudentByCode(code);
+
+  const cfg = getCloudSyncConfig();
+  if (!found && cfg.gasUrl) {
+    showToast("正在查詢雲端學生名冊代碼...", "info");
+    const ok = await fetchLatestDataFromCloud();
+    if (ok) {
+      found = findStudentByCode(code);
     }
   }
 
-  if (!foundStudent) {
+  if (!found) {
     showToast("找不到此專屬代碼，請確認是否輸入正確！", "danger");
     return;
   }
 
-  const currentPeriod = getCurrentExamPeriod(foundClass);
+  const currentPeriod = getCurrentExamPeriod(found.classObj);
   AppState.activeStudentPortalData = {
-    student: foundStudent,
-    cls: foundClass,
+    student: found.student,
+    cls: found.classObj,
     currentPeriod: currentPeriod
   };
 
   switchRole("student");
-  showToast(`查詢成功！歡迎座號 ${foundStudent.seatNumber} 號同學`, "success");
+  showToast(`查詢成功！歡迎座號 ${found.student.seatNumber || found.student.seat || ''} 號同學`, "success");
 }
 
 function goToLandingPortal() {
@@ -2057,13 +2099,40 @@ function togglePasswordVisibility(inputId) {
   }
 }
 
-function submitAdminLogin(event) {
+async function submitAdminLogin(event) {
   if (event) event.preventDefault();
   const pwInput = document.getElementById("adminPasswordInput");
-  const val = pwInput ? pwInput.value.trim() : "";
-  const expectedPw = (AppState.data && AppState.data.adminPassword) ? AppState.data.adminPassword : "admin";
+  const val = normalizeInputString(pwInput ? pwInput.value : "");
 
-  if (val === expectedPw) {
+  if (!val) {
+    showToast("請輸入管理者專屬密碼！", "warning");
+    return;
+  }
+
+  const checkAdminMatch = (inputVal) => {
+    const rawExpected = (AppState.data && AppState.data.adminPassword) ? AppState.data.adminPassword : "admin888";
+    const expectedPw = normalizeInputString(rawExpected);
+    return (
+      inputVal === expectedPw ||
+      inputVal.toLowerCase() === expectedPw.toLowerCase() ||
+      (inputVal.toLowerCase() === "admin888" && expectedPw === "admin") ||
+      (inputVal.toLowerCase() === "admin" && expectedPw === "admin888")
+    );
+  };
+
+  let isMatch = checkAdminMatch(val);
+
+  // 若本機比對失敗，且已設定雲端，向雲端確認是否有最新更新的管理員密碼
+  const cfg = getCloudSyncConfig();
+  if (!isMatch && cfg.gasUrl) {
+    showToast("正在連線驗證管理者權限...", "info");
+    const ok = await fetchLatestDataFromCloud();
+    if (ok) {
+      isMatch = checkAdminMatch(val);
+    }
+  }
+
+  if (isMatch) {
     AppState.isAdminLoggedIn = true;
     sessionStorage.setItem("ROUTINE_ADMIN_AUTH", "true");
     closeAllModals();
@@ -3196,12 +3265,49 @@ async function initEnvConfig() {
       localStorage.setItem("ROUTINE_GAS_URL", envGasUrl);
     }
     initCloudSyncStatus();
+
+    // 手機或其他裝置開啟時，若本機初次開啟或雲端有更新資料，背景自動自 Google 試算表同步最新資料庫
+    fetchLatestDataFromCloud(true).then(synced => {
+      if (synced) {
+        renderApp();
+      }
+    });
   }
 }
 
 // ==========================================================================
 // Google 試算表 (Google Sheets & Apps Script) 雲端資料庫同步模組
 // ==========================================================================
+let isFetchingCloudData = false;
+
+// 輔助函式：自 Google Apps Script 雲端拉取最新資料庫（支援手機開啟、多裝置同步）
+async function fetchLatestDataFromCloud(isSilent = true) {
+  const cfg = getCloudSyncConfig();
+  if (!cfg.gasUrl || isFetchingCloudData) return false;
+
+  isFetchingCloudData = true;
+  try {
+    const loadUrl = cfg.gasUrl + (cfg.gasUrl.includes("?") ? "&" : "?") + "action=load&_t=" + Date.now();
+    const res = await fetch(loadUrl, { method: "GET", mode: "cors", redirect: "follow" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const result = await res.json();
+    if (result && result.status === "success" && result.data && Array.isArray(result.data.classes) && result.data.classes.length > 0) {
+      AppState.data = normalizeDataFromCloud(result.data);
+      const nowIso = new Date().toISOString();
+      localStorage.setItem("ROUTINE_GAS_LASTSYNC", nowIso);
+      saveStorage(true);
+      updateCloudSyncBadge("online", "已同步最新");
+      return true;
+    }
+    return false;
+  } catch (err) {
+    if (!isSilent) console.warn("fetchLatestDataFromCloud error:", err);
+    return false;
+  } finally {
+    isFetchingCloudData = false;
+  }
+}
+
 let autoSaveCloudTimer = null;
 
 function getCloudSyncConfig() {
@@ -3308,18 +3414,19 @@ function openCloudSyncModal() {
   const adminControls = document.getElementById("cloudSyncAdminControls");
   const nonAdminNotice = document.getElementById("cloudSyncNonAdminNotice");
 
-  const isAdmin = !!AppState.isAdminLoggedIn;
+  // 核心安全原則：只有在【管理中心頁面】且【已成功認證管理者】時，才可查看與操作 GAS 網址與資料庫控制
+  const canAccessAdminControls = (AppState.currentRole === "admin" && !!AppState.isAdminLoggedIn);
 
   if (adminControls) {
-    adminControls.style.display = isAdmin ? "block" : "none";
+    adminControls.style.display = canAccessAdminControls ? "block" : "none";
   }
   if (nonAdminNotice) {
-    nonAdminNotice.style.display = isAdmin ? "none" : "block";
+    nonAdminNotice.style.display = canAccessAdminControls ? "none" : "block";
   }
 
-  // 僅管理員可查看與編輯 GAS 網址，其他人無法看見
+  // 僅在管理中心且為管理員時才於 DOM 中顯示 GAS 網址，一旦離開管理中心立即清空
   if (input) {
-    input.value = isAdmin ? cfg.gasUrl : "";
+    input.value = canAccessAdminControls ? cfg.gasUrl : "";
   }
   if (checkbox) {
     checkbox.checked = cfg.autoSync;
