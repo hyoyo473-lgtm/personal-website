@@ -142,6 +142,18 @@ function initStorage() {
           }
         });
       }
+      // 5. 確保 routineItems 為物件格式 { demerits: [], merits: [] }
+      if (Array.isArray(c.routineItems)) {
+        const obj = { demerits: [], merits: [] };
+        c.routineItems.forEach(it => {
+          if (it.type === "merit") {
+            obj.merits.push(it);
+          } else {
+            obj.demerits.push(it);
+          }
+        });
+        c.routineItems = obj;
+      }
     });
     saveStorage();
   }
@@ -3239,6 +3251,46 @@ function updateCloudSyncBadge(status = "offline", text = "離線模式") {
   }
 }
 
+// 輔助函式：轉換常規項目為陣列格式以相容 Google Apps Script
+function prepareDataForCloudSync(data) {
+  if (!data) return data;
+  const clone = JSON.parse(JSON.stringify(data));
+  if (Array.isArray(clone.classes)) {
+    clone.classes.forEach(cls => {
+      if (cls && cls.routineItems && !Array.isArray(cls.routineItems)) {
+        const arr = [];
+        if (Array.isArray(cls.routineItems.demerits)) {
+          cls.routineItems.demerits.forEach(it => arr.push({ ...it, type: "demerit" }));
+        }
+        if (Array.isArray(cls.routineItems.merits)) {
+          cls.routineItems.merits.forEach(it => arr.push({ ...it, type: "merit" }));
+        }
+        cls.routineItems = arr;
+      }
+    });
+  }
+  return clone;
+}
+
+// 輔助函式：將來自 Google Apps Script 的陣列格式常規項目還原為前端物件格式
+function normalizeDataFromCloud(data) {
+  if (!data || !Array.isArray(data.classes)) return data;
+  data.classes.forEach(cls => {
+    if (cls && Array.isArray(cls.routineItems)) {
+      const obj = { demerits: [], merits: [] };
+      cls.routineItems.forEach(it => {
+        if (it.type === "merit") {
+          obj.merits.push(it);
+        } else {
+          obj.demerits.push(it);
+        }
+      });
+      cls.routineItems = obj;
+    }
+  });
+  return data;
+}
+
 function initCloudSyncStatus() {
   const cfg = getCloudSyncConfig();
   if (!cfg.gasUrl) {
@@ -3253,17 +3305,35 @@ function openCloudSyncModal() {
   const input = document.getElementById("gasApiUrlInput");
   const checkbox = document.getElementById("autoCloudSyncCheckbox");
   const envNotice = document.getElementById("gasEnvNotice");
+  const adminControls = document.getElementById("cloudSyncAdminControls");
+  const nonAdminNotice = document.getElementById("cloudSyncNonAdminNotice");
 
-  if (input) input.value = cfg.gasUrl;
-  if (checkbox) checkbox.checked = cfg.autoSync;
+  const isAdmin = !!AppState.isAdminLoggedIn;
 
-  if (envNotice) {
+  if (adminControls) {
+    adminControls.style.display = isAdmin ? "block" : "none";
+  }
+  if (nonAdminNotice) {
+    nonAdminNotice.style.display = isAdmin ? "none" : "block";
+  }
+
+  // 僅管理員可查看與編輯 GAS 網址，其他人無法看見
+  if (input) {
+    input.value = isAdmin ? cfg.gasUrl : "";
+  }
+  if (checkbox) {
+    checkbox.checked = cfg.autoSync;
+  }
+
+  if (envNotice && isAdmin) {
     if (cfg.envGasUrl) {
       envNotice.style.display = "block";
       envNotice.innerHTML = `⚡ 已載入環境變數設定 (<code>GOOGLE_APP_SCRIPT_URL</code>)`;
     } else {
       envNotice.style.display = "none";
     }
+  } else if (envNotice) {
+    envNotice.style.display = "none";
   }
 
   const modal = document.getElementById("cloudSyncModal");
@@ -3279,6 +3349,11 @@ function openCloudSyncModal() {
 }
 
 function saveCloudSettings() {
+  if (!AppState.isAdminLoggedIn) {
+    showToast("⚠️ 變更 Google Apps Script 網址設定僅限校務管理員操作！", "warning");
+    return;
+  }
+
   const input = document.getElementById("gasApiUrlInput");
   const checkbox = document.getElementById("autoCloudSyncCheckbox");
 
@@ -3309,10 +3384,12 @@ function saveCloudSettings() {
 
 function testCloudConnection(isSilent = false, onSuccess = null) {
   const cfg = getCloudSyncConfig();
-  const gasUrl = (document.getElementById("gasApiUrlInput")?.value || cfg.gasUrl).trim();
+  const gasUrl = (AppState.isAdminLoggedIn && document.getElementById("gasApiUrlInput")?.value
+    ? document.getElementById("gasApiUrlInput").value
+    : cfg.gasUrl).trim();
 
   if (!gasUrl) {
-    if (!isSilent) showToast("請先輸入 Google Apps Script 網頁應用程式網址！", "warning");
+    if (!isSilent) showToast("尚未設定 Google Apps Script 網址，請先由管理員進行設定！", "warning");
     updateCloudSyncBadge("offline", "尚未設定");
     return;
   }
@@ -3347,9 +3424,14 @@ function testCloudConnection(isSilent = false, onSuccess = null) {
 }
 
 function uploadToCloud(isSilent = false) {
+  if (!isSilent && !AppState.isAdminLoggedIn) {
+    showToast("⚠️ 手動上傳備份至試算表僅限校務管理員操作！", "warning");
+    return;
+  }
+
   const cfg = getCloudSyncConfig();
   if (!cfg.gasUrl) {
-    if (!isSilent) showToast("尚未設定 Google Apps Script 網址，請先進行設定", "warning");
+    if (!isSilent) showToast("尚未設定 Google Apps Script 網址，請先由管理員進行設定", "warning");
     return;
   }
 
@@ -3360,7 +3442,7 @@ function uploadToCloud(isSilent = false) {
 
   const payload = {
     action: "save",
-    data: AppState.data
+    data: prepareDataForCloudSync(AppState.data)
   };
 
   fetch(cfg.gasUrl, {
@@ -3400,9 +3482,14 @@ function uploadToCloud(isSilent = false) {
 }
 
 function downloadFromCloud() {
+  if (!AppState.isAdminLoggedIn) {
+    showToast("⚠️ 從試算表下載覆蓋資料庫僅限校務管理員操作！", "warning");
+    return;
+  }
+
   const cfg = getCloudSyncConfig();
   if (!cfg.gasUrl) {
-    showToast("尚未設定 Google Apps Script 網址，請先進行設定", "warning");
+    showToast("尚未設定 Google Apps Script 網址，請先由管理員進行設定", "warning");
     return;
   }
 
@@ -3421,7 +3508,7 @@ function downloadFromCloud() {
     .then(res => res.json())
     .then(result => {
       if (result.status === "success" && result.data && result.data.classes) {
-        AppState.data = result.data;
+        AppState.data = normalizeDataFromCloud(result.data);
         const nowIso = new Date().toISOString();
         localStorage.setItem("ROUTINE_GAS_LASTSYNC", nowIso);
         saveStorage(true); // 存入 LocalStorage，略過立即回傳雲端

@@ -110,16 +110,9 @@
           <div class="role-card-badge">班級導師專區</div>
           <div class="role-card-icon">👨‍🏫</div>
           <h2 class="role-card-title">導師工作台</h2>
-          <p class="role-card-subtitle">
-            供班級導師進行每日常規點選、段考週期管理、全班總表統計與警告處分陳報。
+          <p class="role-card-subtitle" style="font-size: 0.95rem; line-height: 1.6; color: var(--slate-600); margin: 0.75rem 0 1.25rem 0;">
+            密碼由管理員提供，忘記密碼請找管理員詢問。
           </p>
-
-          <div class="role-features-list">
-            <div class="feature-item">✓ 1 ~ 35 號座位盤一鍵快速登記優缺點</div>
-            <div class="feature-item">✓ 各班自訂缺點警告上限即時紅框預警與生教單列印</div>
-            <div class="feature-item">✓ 段考週期獨立歸零（無功過相抵）</div>
-            <div class="feature-item">✓ 匯出 Excel 統計表與家長通知小卡排版</div>
-          </div>
 
           <div class="role-action-box">
             <form onsubmit="loginTeacherWithPassword(event)">
@@ -143,16 +136,10 @@
           <div class="role-card-badge student-badge">學生與家長專區</div>
           <div class="role-card-icon">👨‍👩‍👧</div>
           <h2 class="role-card-title">學生 / 家長查詢</h2>
-          <p class="role-card-subtitle">
-            學生與家長僅需輸入個人專屬隨機代碼即可查詢，無需帳號密碼，完全零個資風險。
+          <p class="role-card-subtitle" style="font-size: 0.95rem; line-height: 1.6; color: var(--slate-600); margin: 0.75rem 0 1.25rem 0;">
+            密碼代碼輸入格式為「班級-代碼」（例如：<strong>801-K8P2</strong>）。<br>
+            忘記密碼請找導師詢問。
           </p>
-
-          <div class="role-features-list">
-            <div class="feature-item">✓ 專屬英數隨機代碼登入，絕不洩漏個資</div>
-            <div class="feature-item">✓ 即時查看目前段考缺點、優點累積次數</div>
-            <div class="feature-item">✓ 距離班級警告上限尚餘次數與警示提醒</div>
-            <div class="feature-item">✓ 完整時間與違規/表揚事由流水帳</div>
-          </div>
 
           <div class="role-action-box">
             <form onsubmit="queryStudentDirectlyFromLanding(event)">
@@ -722,7 +709,7 @@
   <div class="modal-backdrop" id="cloudSyncModal">
     <div class="modal-content" style="max-width: 620px;">
       <div class="modal-header">
-        <h3 class="modal-title">☁️ Google 試算表雲端同步與設定</h3>
+        <h3 class="modal-title">☁️ Google 試算表雲端連線狀態</h3>
         <button class="modal-close-btn" onclick="closeAllModals()">&times;</button>
       </div>
       <div class="modal-body">
@@ -734,67 +721,84 @@
               串接 Google 試算表 (Google Sheets) 雲端資料庫
             </div>
             <div style="font-size: 0.8rem; color: var(--slate-600); line-height: 1.45;">
-              透過 Google Apps Script 免費後端，將全校常規紀錄流水帳、學生名冊與自訂項目同步至您的雲端試算表。
+              常規紀錄流水帳、學生名冊與設定將同步至 Google 雲端試算表。
             </div>
           </div>
         </div>
 
-        <!-- 網址設定輸入框 -->
-        <div class="form-group" style="margin-top: 1rem;">
-          <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>Google Apps Script 網頁應用程式網址 (Web App URL)</span>
-            <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 600;">※ 依 README.md 教學取得</span>
-          </label>
-          <input type="url" id="gasApiUrlInput" class="input-text" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="font-family: monospace; font-size: 0.82rem;">
-          <div id="gasEnvNotice" style="display: none; font-size: 0.75rem; color: var(--primary-700); background: var(--primary-50); border: 1px solid var(--primary-200); padding: 5px 10px; border-radius: var(--radius-sm); margin-top: 6px;"></div>
-          <div style="font-size: 0.75rem; color: var(--slate-500); margin-top: 4px;">
-            提示：部屬時權限須設為「任何人 (Anyone)」，網址格式以 <code>https://script.google.com/macros/s/.../exec</code> 結尾
-          </div>
-        </div>
-
-        <!-- 自動同步開關 -->
-        <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
-          <div>
-            <div style="font-weight: 700; font-size: 0.85rem; color: var(--slate-800);">⚡ 自動背景同步 (Auto-Sync)</div>
-            <div style="font-size: 0.75rem; color: var(--slate-500);">日常登記、修改名冊或項目時，自動非同步推送到 Google 試算表</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="autoCloudSyncCheckbox" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <!-- 狀態資訊 -->
-        <div id="cloudSyncStatusPanel" class="cloud-status-panel">
-          <div style="font-size: 0.82rem; color: var(--slate-700); margin-bottom: 3px;">
+        <!-- 連線狀態面板 (全員可見) -->
+        <div id="cloudSyncStatusPanel" class="cloud-status-panel" style="margin-top: 1rem;">
+          <div style="font-size: 0.85rem; color: var(--slate-700); margin-bottom: 4px;">
             <strong>目前連線狀態：</strong><span id="cloudStatusLabel">⚪ 尚未設定 (離線模式)</span>
           </div>
-          <div style="font-size: 0.75rem; color: var(--slate-500);">
+          <div style="font-size: 0.78rem; color: var(--slate-500);">
             <strong>上次同步時間：</strong><span id="cloudLastSyncTime">無</span>
           </div>
         </div>
 
-        <!-- 操作按鈕群 -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
-          <button type="button" class="btn btn-outline" onclick="testCloudConnection()" id="btnTestCloudConn">
-            🔌 測試連線
-          </button>
-          <button type="button" class="btn btn-primary" onclick="saveCloudSettings()">
-            💾 儲存網址設定
+        <!-- 一般使用者提示 (非管理員時顯示) -->
+        <div id="cloudSyncNonAdminNotice" style="display: none; background: var(--slate-50); border: 1px dashed var(--slate-300); border-radius: var(--radius-md); padding: 1.25rem 1rem; margin-top: 1rem; text-align: center;">
+          <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🔒</div>
+          <div style="font-weight: 700; font-size: 0.9rem; color: var(--slate-800); margin-bottom: 0.35rem;">資料庫上傳、下載與網址設定僅限校務管理員</div>
+          <div style="font-size: 0.8rem; color: var(--slate-500); line-height: 1.6; margin-bottom: 0.75rem;">
+            後端 Google Apps Script 串接網址及手動資料庫同步功能已受到保護。<br>
+            日常紀錄皆由系統於背景自動同步至 Google 試算表。
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="closeAllModals(); openAdminLoginModal();" style="font-size: 0.8rem; font-weight: 600;">
+            🔑 登入校務管理員
           </button>
         </div>
 
-        <div style="border-top: 1px solid var(--slate-200); margin-top: 1.25rem; padding-top: 1rem;">
-          <div style="font-weight: 700; font-size: 0.85rem; color: var(--slate-800); margin-bottom: 0.5rem;">
-            手動同步操作
+        <!-- 管理員專屬控制台 (僅 AppState.isAdminLoggedIn 時顯示) -->
+        <div id="cloudSyncAdminControls" style="display: none;">
+          <!-- 網址設定輸入框 -->
+          <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Google Apps Script 網頁應用程式網址 (Web App URL)</span>
+              <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 600;">※ 僅管理員可見</span>
+            </label>
+            <input type="url" id="gasApiUrlInput" class="input-text" placeholder="https://script.google.com/macros/s/AKfycb.../exec" style="font-family: monospace; font-size: 0.82rem;">
+            <div id="gasEnvNotice" style="display: none; font-size: 0.75rem; color: var(--primary-700); background: var(--primary-50); border: 1px solid var(--primary-200); padding: 5px 10px; border-radius: var(--radius-sm); margin-top: 6px;"></div>
+            <div style="font-size: 0.75rem; color: var(--slate-500); margin-top: 4px;">
+              提示：部署時執行身分設為「我 (Me)」，存取權限須設為「任何人 (Anyone)」。
+            </div>
           </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-            <button type="button" class="btn btn-outline" onclick="uploadToCloud()" id="btnUploadCloud" style="color: var(--primary-700); border-color: var(--primary-300);">
-              ⬆️ 立即上傳備份至試算表
+
+          <!-- 自動同步開關 -->
+          <div style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: var(--radius-md); padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-weight: 700; font-size: 0.85rem; color: var(--slate-800);">⚡ 自動背景同步 (Auto-Sync)</div>
+              <div style="font-size: 0.75rem; color: var(--slate-500);">日常登記、修改名冊或項目時，自動非同步推送到 Google 試算表</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="autoCloudSyncCheckbox" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- 操作按鈕群 -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-outline" onclick="testCloudConnection()" id="btnTestCloudConn">
+              🔌 測試連線
             </button>
-            <button type="button" class="btn btn-outline" onclick="downloadFromCloud()" id="btnDownloadCloud" style="color: var(--success-700); border-color: var(--success-300);">
-              ⬇️ 從試算表下載覆蓋
+            <button type="button" class="btn btn-primary" onclick="saveCloudSettings()">
+              💾 儲存網址設定
             </button>
+          </div>
+
+          <!-- 手動同步資料庫 (上傳 / 下載) -->
+          <div style="border-top: 1px solid var(--slate-200); margin-top: 1.25rem; padding-top: 1rem;">
+            <div style="font-weight: 700; font-size: 0.85rem; color: var(--slate-800); margin-bottom: 0.5rem;">
+              資料庫手動同步 (僅限管理員)
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <button type="button" class="btn btn-outline" onclick="uploadToCloud()" id="btnUploadCloud" style="color: var(--primary-700); border-color: var(--primary-300); font-weight: 700;">
+                ⬆️ 立即上傳備份至試算表
+              </button>
+              <button type="button" class="btn btn-outline" onclick="downloadFromCloud()" id="btnDownloadCloud" style="color: var(--success-700); border-color: var(--success-300); font-weight: 700;">
+                ⬇️ 從試算表下載覆蓋
+              </button>
+            </div>
           </div>
         </div>
       </div>
