@@ -587,8 +587,33 @@
               </div>
             </div>
 
+            <!-- 段考歷程選擇列 (提供家長自由切換各次段考或全學期紀錄) -->
+            <div class="portal-period-bar" style="background: white; border: 1.5px solid var(--primary-200); border-radius: var(--radius-lg); padding: 0.9rem 1.25rem; margin: 1.25rem 1.5rem 0 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--primary-100); color: var(--primary-700); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                  📅
+                </div>
+                <div>
+                  <div style="font-size: 0.78rem; color: var(--slate-500); font-weight: 600;">目前檢視段考週期：</div>
+                  <div style="font-size: 1rem; font-weight: 800; color: var(--slate-900);" id="portalSelectedPeriodTitle">
+                    <!-- 由 app.js 動態渲染 -->
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--slate-500); margin-top: 2px;" id="portalSelectedPeriodDates">
+                    <!-- 由 app.js 動態渲染 -->
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label for="portalExamPeriodSelect" style="font-size: 0.85rem; font-weight: 700; color: var(--slate-700);">切換段考：</label>
+                <select id="portalExamPeriodSelect" class="input-select" onchange="onParentChangeExamPeriod(this.value)" style="min-width: 220px; font-weight: 700; border-color: var(--primary-400); color: var(--primary-800); background: var(--primary-50); cursor: pointer;">
+                  <!-- 由 app.js 動態渲染 -->
+                </select>
+              </div>
+            </div>
+
             <!-- 警告提醒橫幅 (若滿15次或接近15次) -->
-            <div id="portalWarningAlertBanner" style="display: none; margin: 1.5rem 1.5rem 0 1.5rem;">
+            <div id="portalWarningAlertBanner" style="display: none; margin: 1.25rem 1.5rem 0 1.5rem;">
               <!-- 由 app.js 動態渲染 -->
             </div>
 
@@ -613,7 +638,7 @@
 
             <!-- 詳細常規流水帳清單 -->
             <div style="padding: 1.5rem 1.5rem 0.5rem 1.5rem;">
-              <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--slate-900);">
+              <h3 id="portalHistoryTitle" style="font-size: 1.1rem; font-weight: 800; color: var(--slate-900);">
                 📋 本段考常規登記詳細明細
               </h3>
             </div>
@@ -948,6 +973,7 @@
       </div>
       <div class="modal-body">
         <input type="hidden" id="periodFormId" value="">
+        <input type="hidden" id="periodFormClassId" value="">
 
         <div class="form-group">
           <label class="form-label">段考名稱 *</label>
@@ -956,11 +982,11 @@
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
           <div class="form-group">
-            <label class="form-label">開始日期</label>
+            <label class="form-label">開始累積日期</label>
             <input type="date" id="periodFormStart" class="input-date">
           </div>
           <div class="form-group">
-            <label class="form-label">結束日期</label>
+            <label class="form-label">結束累積日期</label>
             <input type="date" id="periodFormEnd" class="input-date">
           </div>
         </div>
@@ -968,6 +994,16 @@
         <div class="form-group">
           <label class="form-label">備註說明</label>
           <input type="text" id="periodFormNote" class="input-text" placeholder="例：第二次段考常規歸零重新計算">
+        </div>
+
+        <div class="form-group" style="background: var(--primary-50); border: 1.5px solid var(--primary-200); padding: 0.85rem 1rem; border-radius: var(--radius-md); margin-top: 0.75rem;">
+          <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 700; color: var(--primary-900); margin: 0;">
+            <input type="checkbox" id="periodFormIsCurrent" style="width: 18px; height: 18px; accent-color: var(--primary-600);">
+            <span>設為目前進行中段考（計分歸零基準）</span>
+          </label>
+          <div style="font-size: 0.75rem; color: var(--primary-700); margin-top: 4px; padding-left: 26px; line-height: 1.4;">
+            ※ 勾選後，系統即刻以此段考區間歸零重新累積計分。過去各次段考歷史明細仍完好保留供導師與家長查閱。
+          </div>
         </div>
       </div>
       <div class="modal-footer">

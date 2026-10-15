@@ -212,6 +212,23 @@ function getCurrentExamPeriod(cls) {
   return p;
 }
 
+// 依據登記日期自動對應所屬段考區間（若在區間外則回傳現行進行中段考）
+function getExamPeriodForDate(cls, dateStr) {
+  if (!cls || !cls.examPeriods || cls.examPeriods.length === 0) return null;
+  if (dateStr) {
+    const match = cls.examPeriods.find(p => {
+      if (p.startDate && p.endDate) {
+        return dateStr >= p.startDate && dateStr <= p.endDate;
+      } else if (p.startDate && !p.endDate) {
+        return dateStr >= p.startDate;
+      }
+      return false;
+    });
+    if (match) return match;
+  }
+  return getCurrentExamPeriod(cls);
+}
+
 // 統計學生在特定段考的優缺點數量
 function getStudentStats(cls, studentId, examPeriodId = null) {
   const targetPeriodId = examPeriodId || cls.currentExamPeriodId;
@@ -692,12 +709,15 @@ function submitRoutineRecord(event) {
   const recordCount = parseInt(document.getElementById("recordCountInput").value, 10) || 1;
   const recordNote = document.getElementById("recordNoteInput").value.trim();
 
+  // 依登記日期確認對應段考區間（預設為現行段考）
+  const targetPeriod = getExamPeriodForDate(cls, recordDate) || examPeriod;
+
   let newlyTriggeredWarnings = [];
 
   // 對選取的每位同學新增一筆紀錄
   AppState.selectedStudentIds.forEach(studentId => {
     const student = cls.students.find(s => s.id === studentId);
-    const beforeStats = getStudentStats(cls, studentId, examPeriod.id);
+    const beforeStats = getStudentStats(cls, studentId, targetPeriod.id);
 
     const newRecord = {
       id: uid("rec"),
@@ -707,7 +727,7 @@ function submitRoutineRecord(event) {
       itemName: itemObj.name,
       count: recordCount,
       date: recordDate,
-      examPeriodId: examPeriod.id,
+      examPeriodId: targetPeriod.id,
       note: recordNote,
       timestamp: Date.now()
     };
@@ -1376,43 +1396,51 @@ function deleteRoutineItem(type, itemId) {
 
 // ==========================================================================
 // 分頁 6：段考週期管理 (Exam Periods)
-// ==========================================================================
 function renderPeriodsTab(cls) {
   const periodsList = document.getElementById("periodsListContainer");
   if (!periodsList) return;
 
-  periodsList.innerHTML = cls.examPeriods.map(p => {
-    const isCurrent = p.id === cls.currentExamPeriodId;
-    return `
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: ${isCurrent ? 'var(--primary-50)' : 'white'}; border: 1.5px solid ${isCurrent ? 'var(--primary-500)' : 'var(--slate-200)'}; border-radius: var(--radius-lg); margin-bottom: 0.75rem;">
-        <div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <strong style="font-size: 1.05rem; color: var(--slate-900);">${p.name}</strong>
-            ${isCurrent ? `<span style="background: var(--primary-600); color: white; padding: 2px 8px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700;">進行中 (當前累積)</span>` : ''}
+  const currentPeriod = getCurrentExamPeriod(cls);
+
+  periodsList.innerHTML = `
+    <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: 0.9rem 1.25rem; margin-bottom: 1.25rem; font-size: 0.85rem; color: var(--primary-900); line-height: 1.5;">
+      💡 <strong>段考週期與歸零機制說明：</strong><br>
+      您可以自由編輯每次段考的<strong>開始與結束累積日期</strong>。當段考結束要進入下一個週期時，點選<strong>「切換為現行段考」</strong>（或於編輯區間中勾選設為現行），全班優缺點計分即刻<strong>歸零重新累計</strong>。先前的所有常規紀錄仍會完整保存，家長與導師可隨時依段考選單調閱歷史明細。
+    </div>
+
+    ${cls.examPeriods.map(p => {
+      const isCurrent = p.id === cls.currentExamPeriodId || (currentPeriod && p.id === currentPeriod.id);
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.15rem 1.25rem; background: ${isCurrent ? 'var(--primary-50)' : 'white'}; border: 1.5px solid ${isCurrent ? 'var(--primary-500)' : 'var(--slate-200)'}; border-radius: var(--radius-lg); margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong style="font-size: 1.05rem; color: var(--slate-900);">${p.name}</strong>
+              ${isCurrent ? `<span style="background: var(--primary-600); color: white; padding: 2px 8px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700;">📌 目前進行中 (計分歸零基準)</span>` : ''}
+            </div>
+            <div style="font-size: 0.85rem; color: var(--slate-600); margin-top: 4px;">
+              <strong>累積日期區間：</strong>${p.startDate || '未設定開始'} ~ ${p.endDate || '未設定結束'}
+              ${p.note ? `<span style="color: var(--slate-400); margin-left: 8px;">(${p.note})</span>` : ''}
+            </div>
           </div>
-          <div style="font-size: 0.85rem; color: var(--slate-600); margin-top: 4px;">
-            日期區間：${p.startDate || '未設定'} ~ ${p.endDate || '未設定'}
-            ${p.note ? `<span style="color: var(--slate-400); margin-left: 8px;">(${p.note})</span>` : ''}
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            ${!isCurrent ? `
+              <button class="btn btn-primary btn-sm" onclick="setActiveExamPeriod('${p.id}')">
+                切換為現行段考 (歸零重計)
+              </button>
+            ` : ''}
+            <button class="btn btn-outline btn-sm" onclick="openEditPeriodModal('${p.id}')">
+              ✏️ 編輯區間日期
+            </button>
+            ${cls.examPeriods.length > 1 && !isCurrent ? `
+              <button class="btn btn-outline btn-sm" onclick="deleteExamPeriod('${p.id}')" style="color: var(--danger-600);">
+                刪除
+              </button>
+            ` : ''}
           </div>
         </div>
-        <div style="display: flex; gap: 6px;">
-          ${!isCurrent ? `
-            <button class="btn btn-primary btn-sm" onclick="setActiveExamPeriod('${p.id}')">
-              切換為現行段考
-            </button>
-          ` : ''}
-          <button class="btn btn-outline btn-sm" onclick="openEditPeriodModal('${p.id}')">
-            編輯區間
-          </button>
-          ${cls.examPeriods.length > 1 && !isCurrent ? `
-            <button class="btn btn-outline btn-sm" onclick="deleteExamPeriod('${p.id}')" style="color: var(--danger-600);">
-              刪除
-            </button>
-          ` : ''}
-        </div>
-      </div>
-    `;
-  }).join("");
+      `;
+    }).join("")}
+  `;
 }
 
 // 切換現行段考
@@ -1427,43 +1455,78 @@ function setActiveExamPeriod(periodId) {
   showToast("已切換為現行段考！優缺點即時歸零並重新以此段考累計", "success");
 }
 
-// 新增段考對話框
-function openAddPeriodModal() {
+// 新增段考對話框 (支援導師或管理員指定班級)
+function openAddPeriodModal(classId = null) {
   document.getElementById("periodFormId").value = "";
+  document.getElementById("periodFormClassId").value = classId || "";
   document.getElementById("periodFormName").value = "";
   document.getElementById("periodFormStart").value = new Date().toISOString().split("T")[0];
   document.getElementById("periodFormEnd").value = "";
   document.getElementById("periodFormNote").value = "";
+  const isCurrentCheckbox = document.getElementById("periodFormIsCurrent");
+  if (isCurrentCheckbox) isCurrentCheckbox.checked = false;
   document.getElementById("periodModal").classList.add("open");
 }
 
-// 編輯段考對話框
-function openEditPeriodModal(periodId) {
-  const cls = getCurrentClass();
+// 編輯段考對話框 (支援導師或管理員指定班級)
+function openEditPeriodModal(periodId, classId = null) {
+  let cls = null;
+  if (classId) {
+    cls = AppState.data.classes.find(c => c.id === classId);
+  } else {
+    cls = getCurrentClass();
+  }
+  if (!cls) return;
+
   const p = cls.examPeriods.find(ep => ep.id === periodId);
   if (!p) return;
 
   document.getElementById("periodFormId").value = p.id;
+  document.getElementById("periodFormClassId").value = cls.id;
   document.getElementById("periodFormName").value = p.name;
   document.getElementById("periodFormStart").value = p.startDate || "";
   document.getElementById("periodFormEnd").value = p.endDate || "";
   document.getElementById("periodFormNote").value = p.note || "";
+
+  const isCurrentCheckbox = document.getElementById("periodFormIsCurrent");
+  if (isCurrentCheckbox) {
+    isCurrentCheckbox.checked = (p.id === cls.currentExamPeriodId || !!p.isCurrent);
+  }
+
   document.getElementById("periodModal").classList.add("open");
+}
+
+function openAdminEditPeriodModal(classId, periodId) {
+  openEditPeriodModal(periodId, classId);
 }
 
 // 儲存段考表單
 function savePeriodForm() {
-  const cls = getCurrentClass();
+  const targetClassId = document.getElementById("periodFormClassId").value;
+  let cls = null;
+  if (targetClassId) {
+    cls = AppState.data.classes.find(c => c.id === targetClassId);
+  } else {
+    cls = getCurrentClass();
+  }
+  if (!cls) {
+    showToast("找不到對應班級資料！", "danger");
+    return;
+  }
+
   const id = document.getElementById("periodFormId").value;
   const name = document.getElementById("periodFormName").value.trim();
   const start = document.getElementById("periodFormStart").value;
   const end = document.getElementById("periodFormEnd").value;
   const note = document.getElementById("periodFormNote").value.trim();
+  const isCurrent = document.getElementById("periodFormIsCurrent") ? document.getElementById("periodFormIsCurrent").checked : false;
 
   if (!name) {
     showToast("請輸入段考名稱！", "warning");
     return;
   }
+
+  let savedPeriodId = id;
 
   if (id) {
     const p = cls.examPeriods.find(ep => ep.id === id);
@@ -1474,21 +1537,34 @@ function savePeriodForm() {
       p.note = note;
     }
   } else {
+    savedPeriodId = uid("period");
     const newPeriod = {
-      id: uid("period"),
+      id: savedPeriodId,
       name: name,
       startDate: start,
       endDate: end,
-      isCurrent: false,
+      isCurrent: isCurrent,
       note: note
     };
     cls.examPeriods.push(newPeriod);
   }
 
+  // 若勾選設為現行段考，即刻切換並歸零
+  if (isCurrent) {
+    cls.currentExamPeriodId = savedPeriodId;
+    cls.examPeriods.forEach(p => p.isCurrent = (p.id === savedPeriodId));
+  }
+
   saveStorage();
   closeAllModals();
-  renderApp();
-  showToast("段考區間已儲存！", "success");
+
+  if (AppState.currentRole === "admin") {
+    renderAdminPeriods();
+  } else {
+    renderApp();
+  }
+
+  showToast(`段考區間已成功儲存！${isCurrent ? '（已設為現行段考並重新計分）' : ''}`, "success");
 }
 
 // 刪除段考
@@ -1504,149 +1580,200 @@ function deleteExamPeriod(periodId) {
 
 // ==========================================================================
 // 學生/家長查詢專區 (Student / Parent Portal)
-// ==========================================================================
 function renderStudentView() {
   const resultCard = document.getElementById("studentPortalResult");
   const loginCard = document.getElementById("studentPortalLogin");
 
   if (!AppState.activeStudentPortalData) {
-    loginCard.style.display = "block";
-    resultCard.style.display = "none";
+    if (loginCard) loginCard.style.display = "block";
+    if (resultCard) resultCard.style.display = "none";
     return;
   }
 
-  loginCard.style.display = "none";
-  resultCard.style.display = "block";
+  if (loginCard) loginCard.style.display = "none";
+  if (resultCard) resultCard.style.display = "block";
 
-  const { student, cls, currentPeriod } = AppState.activeStudentPortalData;
-  const stats = getStudentStats(cls, student.id, currentPeriod.id);
-  const isWarning = stats.demerits >= 15;
-  const isCaution = stats.demerits >= 12 && stats.demerits < 15;
-  const remaining = Math.max(0, 15 - stats.demerits);
+  const { student, cls } = AppState.activeStudentPortalData;
+  const activeClass = AppState.data.classes.find(c => c.id === cls.id) || cls;
+  const currentPeriod = getCurrentExamPeriod(activeClass);
 
-  // 學生資訊
-  document.getElementById("portalStudentHeaderInfo").innerHTML = `
-    <div style="font-size: 0.85rem; color: #93c5fd; letter-spacing: 0.05em; font-weight: 600;">
-      ${cls.school || '國中'} • ${cls.name}
-    </div>
-    <h2 style="font-size: 1.8rem; font-weight: 800; margin: 4px 0;">
-      座號 ${student.seatNumber} 號 同學
-    </h2>
-    <div style="font-size: 0.85rem; color: #cbd5e1;">
-      專屬查詢代碼：<code>${student.code}</code> | 學生姓名：${student.name.charAt(0)}○${student.name.length > 2 ? student.name.slice(-1) : ''} (個資安全保護)
-    </div>
-  `;
+  // 取得目前選取的段考週期 (預設為進行中的段考)
+  let selectedPeriodId = AppState.activeStudentPortalData.selectedPeriodId || activeClass.currentExamPeriodId || (currentPeriod ? currentPeriod.id : "all");
 
-  // 統計數據
-  document.getElementById("portalDemeritCount").textContent = stats.demerits;
-  document.getElementById("portalMeritCount").textContent = stats.merits;
-  document.getElementById("portalRemainingCount").textContent = remaining;
+  // 若選取的段考不在該班清單中且不為 all，重設為現行段考
+  if (selectedPeriodId !== "all" && !activeClass.examPeriods.some(p => p.id === selectedPeriodId)) {
+    selectedPeriodId = activeClass.currentExamPeriodId || (currentPeriod ? currentPeriod.id : "all");
+    AppState.activeStudentPortalData.selectedPeriodId = selectedPeriodId;
+  }
+
+  // 渲染段考下拉選單
+  const periodSelect = document.getElementById("portalExamPeriodSelect");
+  if (periodSelect) {
+    const optionsHtml = [
+      ...activeClass.examPeriods.map(p => {
+        const isCurrent = p.id === activeClass.currentExamPeriodId || (currentPeriod && p.id === currentPeriod.id);
+        const datesText = (p.startDate || p.endDate) ? ` (${p.startDate || ''} ~ ${p.endDate || ''})` : '';
+        return `<option value="${p.id}" ${p.id === selectedPeriodId ? 'selected' : ''}>${isCurrent ? '📌 [現行] ' : ''}${p.name}${datesText}</option>`;
+      }),
+      `<option value="all" ${selectedPeriodId === 'all' ? 'selected' : ''}>📜 全學期所有累積紀錄 (完整歷程)</option>`
+    ].join("");
+    periodSelect.innerHTML = optionsHtml;
+  }
+
+  // 取得選取段考物件與文字
+  let periodObj = null;
+  let periodTitleText = "";
+  let periodDatesText = "";
+
+  if (selectedPeriodId === "all") {
+    periodTitleText = "全學期所有累積紀錄 (跨段考完整歷程)";
+    periodDatesText = "包含本學期歷次段考之全部優缺點流水帳明細";
+  } else {
+    periodObj = activeClass.examPeriods.find(p => p.id === selectedPeriodId) || currentPeriod;
+    const isCurrent = periodObj && (periodObj.id === activeClass.currentExamPeriodId || (currentPeriod && periodObj.id === currentPeriod.id));
+    periodTitleText = `${periodObj ? periodObj.name : '段考紀錄'}${isCurrent ? ' <span style="background: var(--primary-600); color: white; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; vertical-align: middle;">進行中</span>' : ''}`;
+    periodDatesText = `累積區間：${periodObj?.startDate || '未設定'} ~ ${periodObj?.endDate || '未設定'}${periodObj?.note ? ' | ' + periodObj.note : ''}`;
+  }
+
+  const titleEl = document.getElementById("portalSelectedPeriodTitle");
+  if (titleEl) titleEl.innerHTML = periodTitleText;
+  const datesEl = document.getElementById("portalSelectedPeriodDates");
+  if (datesEl) datesEl.textContent = periodDatesText;
+
+  // 計算該段考 (或全部) 之統計數據
+  const stats = getStudentStats(activeClass, student.id, selectedPeriodId);
+  const threshold = getClassThreshold(activeClass);
+  const isWarning = selectedPeriodId !== "all" && stats.demerits >= threshold;
+  const isCaution = selectedPeriodId !== "all" && stats.demerits >= Math.max(1, threshold - 3) && stats.demerits < threshold;
+  const remaining = Math.max(0, threshold - stats.demerits);
+
+  // 學生資訊抬頭
+  const headerInfo = document.getElementById("portalStudentHeaderInfo");
+  if (headerInfo) {
+    headerInfo.innerHTML = `
+      <div style="font-size: 0.85rem; color: #93c5fd; letter-spacing: 0.05em; font-weight: 600;">
+        ${activeClass.school || '國中'} • ${activeClass.name}
+      </div>
+      <h2 style="font-size: 1.8rem; font-weight: 800; margin: 4px 0;">
+        座號 ${student.seatNumber || student.seat || ''} 號 同學
+      </h2>
+      <div style="font-size: 0.85rem; color: #cbd5e1;">
+        專屬查詢代碼：<code>${student.code}</code> | 學生姓名：${student.name.charAt(0)}○${student.name.length > 2 ? student.name.slice(-1) : ''} (個資安全保護)
+      </div>
+    `;
+  }
+
+  // 統計數據填入
+  const demCountEl = document.getElementById("portalDemeritCount");
+  if (demCountEl) demCountEl.textContent = stats.demerits;
+  const merCountEl = document.getElementById("portalMeritCount");
+  if (merCountEl) merCountEl.textContent = stats.merits;
+  const remCountEl = document.getElementById("portalRemainingCount");
+  if (remCountEl) remCountEl.textContent = selectedPeriodId === "all" ? stats.totalRecords : remaining;
+
+  const thresholdTitleEl = document.getElementById("portalStatThresholdTitle");
+  if (thresholdTitleEl) {
+    thresholdTitleEl.textContent = selectedPeriodId === "all" ? "全學期登記總筆數" : "距離警告處分門檻";
+  }
 
   // 警告提示狀態
   const statusBanner = document.getElementById("portalWarningAlertBanner");
-  if (isWarning) {
-    statusBanner.style.display = "block";
-    statusBanner.className = "warning-alert-card";
-    statusBanner.innerHTML = `
-      <div class="warning-alert-left">
-        <div class="warning-alert-icon">🚨</div>
-        <div>
-          <div class="warning-alert-title">本段考缺點已累積滿 15 次！已達警告處分標準</div>
-          <div class="warning-alert-desc">請同學與家長主動向導師了解違規原因，積極改正以維護求學常規與操行表現。</div>
-        </div>
-      </div>
-    `;
-  } else if (isCaution) {
-    statusBanner.style.display = "block";
-    statusBanner.className = "warning-alert-card";
-    statusBanner.style.borderColor = "var(--warning-500)";
-    statusBanner.style.background = "var(--warning-50)";
-    statusBanner.innerHTML = `
-      <div class="warning-alert-left">
-        <div class="warning-alert-icon" style="background: var(--warning-500);">⚠️</div>
-        <div>
-          <div class="warning-alert-title" style="color: var(--warning-600);">缺點已累積 ${stats.demerits} 次，再 ${remaining} 次將記警告！</div>
-          <div class="warning-alert-desc">請特別留意課堂紀律、作業繳交與出缺席，避免再次違規達到警告門檻。</div>
-        </div>
-      </div>
-    `;
-  } else {
-    statusBanner.style.display = "none";
-  }
-
-  // 歷史常規流水帳清單
-  const historyList = document.getElementById("portalHistoryList");
-  const records = stats.records.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-  if (records.length === 0) {
-    historyList.innerHTML = `<div style="text-align: center; color: var(--slate-400); padding: 2rem;">此段考週期尚無任何優缺點登記紀錄，表現優異！</div>`;
-  } else {
-    historyList.innerHTML = records.map(r => {
-      const isDemerit = r.type === "demerit";
-      return `
-        <div class="timeline-item">
-          <div class="timeline-icon ${isDemerit ? 'demerit' : 'merit'}">
-            ${isDemerit ? '✕' : '✓'}
-          </div>
-          <div class="timeline-content">
-            <div class="timeline-title-row">
-              <span class="timeline-title">${r.itemName}</span>
-              <span class="timeline-date">${r.date}</span>
-            </div>
-            <div style="font-size: 0.8rem; font-weight: 700; color: ${isDemerit ? 'var(--danger-600)' : 'var(--success-600)'}; margin-top: 2px;">
-              ${isDemerit ? '缺點' : '優點'} ${r.count || 1} 次
-            </div>
-            ${r.note ? `<div class="timeline-note">說明備註：${r.note}</div>` : ''}
+  if (statusBanner) {
+    if (isWarning) {
+      statusBanner.style.display = "block";
+      statusBanner.className = "warning-alert-card";
+      statusBanner.style.borderColor = "var(--danger-500)";
+      statusBanner.style.background = "var(--danger-50)";
+      statusBanner.innerHTML = `
+        <div class="warning-alert-left">
+          <div class="warning-alert-icon">🚨</div>
+          <div>
+            <div class="warning-alert-title">本段考缺點已累積滿 ${threshold} 次！已達警告處分標準</div>
+            <div class="warning-alert-desc">請同學與家長主動向導師了解違規原因，積極改正以維護求學常規與操行表現。</div>
           </div>
         </div>
       `;
-    }).join("");
-  }
-}
-
-// 學生/家長登入查詢
-function queryStudentByCode(event) {
-  if (event) event.preventDefault();
-  const inputCode = document.getElementById("studentCodeInput").value.trim().toUpperCase();
-
-  if (!inputCode) {
-    showToast("請輸入專屬查詢代碼！", "warning");
-    return;
-  }
-
-  // 在所有班級中尋找擁有此 code 的學生
-  let foundStudent = null;
-  let foundClass = null;
-
-  for (const cls of AppState.data.classes) {
-    const s = cls.students.find(stu => stu.code.toUpperCase() === inputCode);
-    if (s) {
-      foundStudent = s;
-      foundClass = cls;
-      break;
+    } else if (isCaution) {
+      statusBanner.style.display = "block";
+      statusBanner.className = "warning-alert-card";
+      statusBanner.style.borderColor = "var(--warning-500)";
+      statusBanner.style.background = "var(--warning-50)";
+      statusBanner.innerHTML = `
+        <div class="warning-alert-left">
+          <div class="warning-alert-icon" style="background: var(--warning-500);">⚠️</div>
+          <div>
+            <div class="warning-alert-title" style="color: var(--warning-600);">缺點已累積 ${stats.demerits} 次，再 ${remaining} 次將記警告！</div>
+            <div class="warning-alert-desc">請特別留意課堂紀律、作業繳交與出缺席，避免再次違規達到警告門檻。</div>
+          </div>
+        </div>
+      `;
+    } else {
+      statusBanner.style.display = "none";
     }
   }
 
-  if (!foundStudent) {
-    showToast("找不到此專屬代碼，請確認是否輸入正確！", "danger");
-    return;
+  // 流水帳清單抬頭
+  const histTitleEl = document.getElementById("portalHistoryTitle");
+  if (histTitleEl) {
+    histTitleEl.innerHTML = selectedPeriodId === "all"
+      ? `📋 全學期常規登記詳細明細 (共 ${stats.records.length} 筆)`
+      : `📋 【${periodObj ? periodObj.name : '本段考'}】常規登記詳細明細 (共 ${stats.records.length} 筆)`;
   }
 
-  const currentPeriod = getCurrentExamPeriod(foundClass);
-  AppState.activeStudentPortalData = {
-    student: foundStudent,
-    cls: foundClass,
-    currentPeriod: currentPeriod
-  };
+  // 歷史常規流水帳清單渲染
+  const historyList = document.getElementById("portalHistoryList");
+  if (historyList) {
+    const sortedRecords = [...stats.records].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-  showToast(`查詢成功！歡迎座號 ${foundStudent.seatNumber} 號同學`, "success");
+    if (sortedRecords.length === 0) {
+      historyList.innerHTML = `
+        <div style="text-align: center; color: var(--slate-400); padding: 2.5rem 1rem;">
+          【${selectedPeriodId === 'all' ? '本學期' : (periodObj ? periodObj.name : '此段考')}】尚無任何優缺點登記紀錄${selectedPeriodId === activeClass.currentExamPeriodId ? '，表現優異！' : '。'}
+        </div>
+      `;
+    } else {
+      historyList.innerHTML = sortedRecords.map(r => {
+        const isDemerit = r.type === "demerit";
+        const periodOfRecord = activeClass.examPeriods.find(p => p.id === r.examPeriodId);
+        return `
+          <div class="timeline-item">
+            <div class="timeline-icon ${isDemerit ? 'demerit' : 'merit'}">
+              ${isDemerit ? '✕' : '✓'}
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-title-row">
+                <span class="timeline-title">${r.itemName}</span>
+                <span class="timeline-date">${r.date}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                <span style="font-size: 0.82rem; font-weight: 700; color: ${isDemerit ? 'var(--danger-600)' : 'var(--success-600)'};">
+                  ${isDemerit ? '缺點' : '優點'} ${r.count || 1} 次
+                </span>
+                <span style="font-size: 0.72rem; color: var(--slate-600); background: var(--slate-100); border: 1px solid var(--slate-200); padding: 1px 6px; border-radius: 4px;">
+                  ${periodOfRecord ? periodOfRecord.name : '常規紀錄'}
+                </span>
+              </div>
+              ${r.note ? `<div class="timeline-note" style="margin-top: 6px;">說明備註：${r.note}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+  }
+}
+
+// 家長切換段考週期選單
+function onParentChangeExamPeriod(periodId) {
+  if (!AppState.activeStudentPortalData) return;
+  AppState.activeStudentPortalData.selectedPeriodId = periodId;
   renderStudentView();
 }
 
 // 登出學生查詢視圖
 function logoutStudentPortal() {
   AppState.activeStudentPortalData = null;
-  document.getElementById("studentCodeInput").value = "";
+  const input = document.getElementById("studentCodeInput");
+  if (input) input.value = "";
   renderStudentView();
 }
 
@@ -2063,7 +2190,8 @@ async function queryStudentDirectlyFromLanding(event) {
   AppState.activeStudentPortalData = {
     student: found.student,
     cls: found.classObj,
-    currentPeriod: currentPeriod
+    currentPeriod: currentPeriod,
+    selectedPeriodId: found.classObj.currentExamPeriodId || currentPeriod.id
   };
 
   switchRole("student");
@@ -2885,7 +3013,6 @@ function adminSyncRoutineItemsToAllClasses(sourceClassId) {
 
 // --------------------------------------------------------------------------
 // Admin Tab 4: 各班段考週期設定
-// --------------------------------------------------------------------------
 function renderAdminPeriods() {
   const container = document.getElementById("adminTabPane-periods");
   if (!container) return;
@@ -2909,7 +3036,7 @@ function renderAdminPeriods() {
         </div>
 
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button class="btn btn-primary btn-sm" onclick="adminAddPeriodPrompt('${targetClass.id}')">
+          <button class="btn btn-primary btn-sm" onclick="openAddPeriodModal('${targetClass.id}')">
             ➕ 為此班新增段考
           </button>
           <button class="btn btn-warning btn-sm" onclick="adminBatchCreatePeriodForAllClasses()">
@@ -2928,23 +3055,26 @@ function renderAdminPeriods() {
         ${periods.map(p => {
           const isCurrent = p.id === targetClass.currentExamPeriodId || p.isCurrent;
           return `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: ${isCurrent ? 'var(--primary-50)' : 'var(--slate-50)'}; border: 1.5px solid ${isCurrent ? 'var(--primary-300)' : 'var(--slate-200)'}; border-radius: var(--radius-md); flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; background: ${isCurrent ? 'var(--primary-50)' : 'var(--slate-50)'}; border: 1.5px solid ${isCurrent ? 'var(--primary-300)' : 'var(--slate-200)'}; border-radius: var(--radius-md); flex-wrap: wrap; gap: 0.75rem;">
               <div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <strong style="font-size: 1.05rem; color: var(--slate-900);">${p.name}</strong>
                   ${isCurrent ? `<span class="badge-safe" style="background: var(--primary-600); color: white; font-weight: 700;">目前進行中 (計分歸零基準)</span>` : ''}
                 </div>
-                <div style="font-size: 0.82rem; color: var(--slate-500); margin-top: 4px;">
-                  區間：${p.startDate || '未設'} ~ ${p.endDate || '未設'} ${p.note ? `| 備註：${p.note}` : ''}
+                <div style="font-size: 0.82rem; color: var(--slate-600); margin-top: 4px;">
+                  <strong>累積區間：</strong>${p.startDate || '未設'} ~ ${p.endDate || '未設'} ${p.note ? `| 備註：${p.note}` : ''}
                 </div>
               </div>
 
-              <div style="display: flex; gap: 0.5rem;">
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 ${!isCurrent ? `
                   <button class="btn btn-primary btn-sm" onclick="adminSwitchClassPeriod('${targetClass.id}', '${p.id}')">
-                    切換為進行中 (歸零重新計算)
+                    切換為進行中 (歸零重計)
                   </button>
                 ` : ''}
+                <button class="btn btn-outline btn-sm" onclick="openAdminEditPeriodModal('${targetClass.id}', '${p.id}')">
+                  ✏️ 編輯區間
+                </button>
                 ${periods.length > 1 && !isCurrent ? `
                   <button class="btn btn-outline btn-sm" onclick="adminDeletePeriod('${targetClass.id}', '${p.id}')" style="color: var(--danger-600);">
                     刪除
@@ -2974,29 +3104,6 @@ function adminSwitchClassPeriod(classId, periodId) {
   saveStorage();
   renderApp();
   showToast(`已將【${cls.name}】切換至新段考，該班常規累計歸零重新統計！`, "success");
-}
-
-function adminAddPeriodPrompt(classId) {
-  const cls = AppState.data.classes.find(c => c.id === classId);
-  if (!cls) return;
-
-  const name = prompt("請輸入新段考名稱（例：115-1 第2次段考）：");
-  if (!name || !name.trim()) return;
-
-  const start = prompt("請輸入開始日期 (YYYY-MM-DD)：", new Date().toISOString().split("T")[0]);
-  const newP = {
-    id: uid("p"),
-    name: name.trim(),
-    startDate: start || "",
-    endDate: "",
-    isCurrent: false,
-    note: "新段考常規歸零重新計算"
-  };
-
-  cls.examPeriods.push(newP);
-  saveStorage();
-  renderAdminPeriods();
-  showToast(`已新增段考【${name.trim()}】！`, "success");
 }
 
 function adminDeletePeriod(classId, periodId) {
