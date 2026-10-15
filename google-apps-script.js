@@ -125,7 +125,7 @@ function doPost(e) {
     const action = payload.action || "save";
     const appData = payload.data;
 
-    if (action === "save") {
+    if (action === "save" || action === "force_overwrite") {
       if (!appData || !appData.classes) {
         return createJsonResponse({
           status: "error",
@@ -134,10 +134,24 @@ function doPost(e) {
       }
 
       const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const dbSheet = getOrCreateSheet(ss, SHEET_DB);
+
+      let finalData = appData;
+      // 若為一般 save 動作，自動與試算表原有資料庫進行非破壞性雙向合併，防止任何裝置舊資料覆寫最新資料！
+      if (action !== "force_overwrite") {
+        const rawExisting = dbSheet.getRange(1, 1).getValue();
+        if (rawExisting && rawExisting.toString().trim() !== "") {
+          try {
+            const parsedExisting = JSON.parse(rawExisting.toString());
+            finalData = mergeDatabaseObjects(parsedExisting, appData);
+          } catch (mergeErr) {
+            Logger.log("解析試算表既有資料庫進行合併時發生警告：" + mergeErr.message);
+          }
+        }
+      }
 
       // 1. 保存完整原始 JSON 至 【⚙️_系統總資料庫】
-      const dbSheet = getOrCreateSheet(ss, SHEET_DB);
-      dbSheet.getRange(1, 1).setValue(JSON.stringify(appData));
+      dbSheet.getRange(1, 1).setValue(JSON.stringify(finalData));
       const nowIso = new Date().toISOString();
       dbSheet.getRange(1, 2).setValue(nowIso);
       dbSheet.getRange(1, 3).setValue("最後同步時間：" + new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }));
@@ -146,12 +160,12 @@ function doPost(e) {
       let totalRecords = 0;
       let totalStudents = 0;
 
-      syncRecordsSheet(ss, appData);
-      syncStudentsSheet(ss, appData);
-      syncItemsSheet(ss, appData);
+      syncRecordsSheet(ss, finalData);
+      syncStudentsSheet(ss, finalData);
+      syncItemsSheet(ss, finalData);
 
       // 計算統計總量
-      (appData.classes || []).forEach(c => {
+      (finalData.classes || []).forEach(c => {
         totalStudents += (c.students || []).length;
         totalRecords += (c.records || []).length;
       });
@@ -159,7 +173,8 @@ function doPost(e) {
       return createJsonResponse({
         status: "success",
         message: "全校常規資料庫已成功儲存並同步至 Google 試算表！",
-        classesCount: (appData.classes || []).length,
+        data: finalData,
+        classesCount: (finalData.classes || []).length,
         studentsCount: totalStudents,
         recordsCount: totalRecords,
         syncedAt: nowIso
@@ -443,6 +458,119 @@ function createJsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 試算表伺服端非破壞性資料庫合併引擎 (Server-side Non-destructive Merge Engine)
+ * 核心目的：即便某個裝置因為網路延遲或快取較舊而上傳資料，絕不覆寫或刪除試算表既有的最新紀錄！
+ */
+function mergeDatabaseObjects(existingData, incomingData) {
+  if (!existingData || !Array.isArray(existingData.classes)) return incomingData;
+  if (!incomingData || !Array.isArray(incomingData.classes)) return existingData;
+
+  const result = JSON.parse(JSON.stringify(incomingData));
+
+  // 保留自訂管理者密碼
+  if (existingData.adminPassword && (!result.adminPassword || result.adminPassword === "admin888")) {
+    result.adminPassword = existingData.adminPassword;
+  }
+
+  existingData.classes.forEach(function(exCls) {
+    let incCls = null;
+    for (let i = 0; i < result.classes.length; i++) {
+      if (result.classes[i].id === exCls.id) {
+        incCls = result.classes[i];
+        break;
+      }
+    }
+
+    if (!incCls) {
+      result.classes.push(exCls);
+      return;
+    }
+
+    // 1. 合併已註銷/刪除紀錄清單 (deletedRecordIds)
+    incCls.deletedRecordIds = incCls.deletedRecordIds || [];
+    const deletedMap = {};
+    incCls.deletedRecordIds.forEach(function(id) { deletedMap[id] = true; });
+    if (Array.isArray(exCls.deletedRecordIds)) {
+      exCls.deletedRecordIds.forEach(function(id) {
+        if (!deletedMap[id]) {
+          incCls.deletedRecordIds.push(id);
+          deletedMap[id] = true;
+        }
+      });
+    }
+
+    // 2. 依註銷清單過濾傳入紀錄
+    incCls.records = (incCls.records || []).filter(function(r) { return !deletedMap[r.id]; });
+
+    // 3. 雙向保留登記流水紀錄：既存紀錄只要未被註銷且傳入未包含，全數完整保留！
+    const recordIdMap = {};
+    incCls.records.forEach(function(r) { recordIdMap[r.id] = true; });
+
+    if (Array.isArray(exCls.records)) {
+      exCls.records.forEach(function(er) {
+        if (!deletedMap[er.id] && !recordIdMap[er.id]) {
+          incCls.records.push(er);
+          recordIdMap[er.id] = true;
+        }
+      });
+    }
+
+    // 4. 合併學生名冊 (保留既有名冊，補入新增學生)
+    if (Array.isArray(exCls.students)) {
+      incCls.students = incCls.students || [];
+      const stuIdMap = {};
+      incCls.students.forEach(function(s) { stuIdMap[s.id] = s; });
+
+      exCls.students.forEach(function(es) {
+        const existingStu = stuIdMap[es.id];
+        if (existingStu) {
+          if (!existingStu.name && es.name) existingStu.name = es.name;
+          if (!existingStu.code && es.code) existingStu.code = es.code;
+        } else {
+          incCls.students.push(es);
+          stuIdMap[es.id] = es;
+        }
+      });
+    }
+
+    // 5. 常規自訂項目
+    if (!incCls.routineItems && exCls.routineItems) {
+      incCls.routineItems = exCls.routineItems;
+    }
+
+    // 6. 段考時程
+    if (Array.isArray(exCls.examPeriods) && exCls.examPeriods.length > 0) {
+      incCls.examPeriods = incCls.examPeriods || [];
+      const periodIdMap = {};
+      incCls.examPeriods.forEach(function(p) { periodIdMap[p.id] = true; });
+
+      exCls.examPeriods.forEach(function(ep) {
+        if (!periodIdMap[ep.id]) {
+          incCls.examPeriods.push(ep);
+          periodIdMap[ep.id] = true;
+        }
+      });
+    }
+
+    // 7. 班級設定與導師密碼
+    if (!incCls.teacherPassword && exCls.teacherPassword) {
+      incCls.teacherPassword = exCls.teacherPassword;
+    }
+    if (!incCls.warningThreshold && exCls.warningThreshold) {
+      incCls.warningThreshold = exCls.warningThreshold;
+    }
+    if (!incCls.resetMode && exCls.resetMode) {
+      incCls.resetMode = exCls.resetMode;
+    }
+    if (!incCls.customResetDate && exCls.customResetDate) {
+      incCls.customResetDate = exCls.customResetDate;
+    }
+  });
+
+  return result;
 }
 
 /**

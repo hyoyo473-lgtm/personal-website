@@ -104,12 +104,12 @@ function initStorage() {
     } catch (e) {
       console.error("Failed to parse local storage data, resetting to preset.", e);
       AppState.data = JSON.parse(JSON.stringify(PRESET_SAMPLE_DATA));
-      saveStorage();
+      saveStorage(true);
     }
   } else {
     // 預設載入範例資料庫
     AppState.data = JSON.parse(JSON.stringify(PRESET_SAMPLE_DATA));
-    saveStorage();
+    saveStorage(true);
   }
 
   // 確保管理者專屬密碼存在（若無則預設 admin888）
@@ -174,7 +174,7 @@ function initStorage() {
         c.routineItems = obj;
       }
     });
-    saveStorage();
+    saveStorage(true);
   }
 
   // 檢查 session 中的管理者登入狀態
@@ -1999,7 +1999,7 @@ function switchClass(classId) {
   AppState.selectedItemId = null;
   const periodFilter = document.getElementById("overviewPeriodFilter");
   if (periodFilter) periodFilter.innerHTML = "";
-  saveStorage();
+  saveStorage(true);
   closeAllModals();
   renderApp();
   showToast(`已切換為：${getCurrentClass().name}`, "success");
@@ -2300,18 +2300,21 @@ async function loginTeacherWithPassword(event) {
     });
   };
 
-  let matchedClass = findTeacherClass(enteredPw);
-
-  // 若本機查無符合班級（例如手機剛由連結開啟尚未快取雲端資料），且已設定 GAS 網址，立即向雲端同步驗證
   const cfg = getCloudSyncConfig();
-  if (!matchedClass && cfg.gasUrl) {
-    showToast("正在連線驗證雲端班級資料庫，請稍候...", "info");
-    updateCloudSyncBadge("syncing", "驗證中...");
-    const ok = await fetchLatestDataFromCloud();
-    if (ok) {
-      matchedClass = findTeacherClass(enteredPw);
+
+  // 核心安全機制：每次從任何裝置登入前，一律優先強制自雲端下載並合併最新資料庫！
+  if (cfg.gasUrl) {
+    showToast("🔄 正在連線下載雲端最新常規紀錄，請稍候...", "info");
+    updateCloudSyncBadge("syncing", "同步最新中...");
+    try {
+      await fetchLatestDataFromCloud(false);
+      hasInitialCloudSyncCompleted = true;
+    } catch (netErr) {
+      console.warn("登入時雲端同步失敗，切換為本機離線驗證：", netErr);
     }
   }
+
+  let matchedClass = findTeacherClass(enteredPw);
 
   if (!matchedClass) {
     showToast("密碼錯誤或查無對應班級！請向校務管理者洽詢您的導師專屬密碼。", "danger");
@@ -2326,11 +2329,12 @@ async function loginTeacherWithPassword(event) {
   AppState.data.currentClassId = matchedClass.id;
   AppState.loggedInTeacherClassId = matchedClass.id;
   AppState.isImpersonating = false;
-  saveStorage();
+  saveStorage(true); // 注意：僅更新本機 Session 班級偏好，切勿觸發 triggerAutoCloudSave() 覆寫雲端！
 
   if (pwInput) pwInput.value = "";
   switchRole("teacher");
-  showToast(`登入成功！歡迎 ${matchedClass.name} 導師進入常規管理工作台`, "success");
+  startBackgroundCloudPolling(); // 保持登入時自動背景同步輪詢
+  showToast(`登入成功！已同步最新資料，歡迎 ${matchedClass.name} 導師進入常規管理工作台`, "success");
 }
 
 // 導師登出
@@ -2363,16 +2367,19 @@ async function queryStudentDirectlyFromLanding(event) {
     return null;
   };
 
-  let found = findStudentByCode(code);
-
   const cfg = getCloudSyncConfig();
-  if (!found && cfg.gasUrl) {
-    showToast("正在查詢雲端學生名冊代碼...", "info");
-    const ok = await fetchLatestDataFromCloud();
-    if (ok) {
-      found = findStudentByCode(code);
+  // 核心安全機制：學生/家長查詢前優先連線雲端確認最新學生代碼與累計紀錄
+  if (cfg.gasUrl) {
+    updateCloudSyncBadge("syncing", "查詢最新代碼中...");
+    try {
+      await fetchLatestDataFromCloud(true);
+      hasInitialCloudSyncCompleted = true;
+    } catch (e) {
+      console.warn("學生代碼查詢前雲端同步失敗：", e);
     }
   }
+
+  let found = findStudentByCode(code);
 
   if (!found) {
     showToast("找不到此專屬代碼，請確認是否輸入正確！", "danger");
@@ -2441,24 +2448,28 @@ async function submitAdminLogin(event) {
     );
   };
 
-  let isMatch = checkAdminMatch(val);
-
-  // 若本機比對失敗，且已設定雲端，向雲端確認是否有最新更新的管理員密碼
   const cfg = getCloudSyncConfig();
-  if (!isMatch && cfg.gasUrl) {
-    showToast("正在連線驗證管理者權限...", "info");
-    const ok = await fetchLatestDataFromCloud();
-    if (ok) {
-      isMatch = checkAdminMatch(val);
+  // 核心安全機制：登入管理中心前優先連線雲端取得最新設定與管理員密碼
+  if (cfg.gasUrl) {
+    showToast("🔄 正在連線下載雲端最新全校資料庫...", "info");
+    updateCloudSyncBadge("syncing", "同步最新中...");
+    try {
+      await fetchLatestDataFromCloud(false);
+      hasInitialCloudSyncCompleted = true;
+    } catch (e) {
+      console.warn("管理員登入前雲端同步失敗：", e);
     }
   }
+
+  let isMatch = checkAdminMatch(val);
 
   if (isMatch) {
     AppState.isAdminLoggedIn = true;
     sessionStorage.setItem("ROUTINE_ADMIN_AUTH", "true");
     closeAllModals();
     switchRole("admin");
-    showToast("校務管理者認證成功，歡迎進入管理中心！", "success");
+    startBackgroundCloudPolling(); // 保持管理員登入時自動背景同步輪詢
+    showToast("校務管理者認證成功，已同步最新全校資料庫！", "success");
   } else {
     showToast("管理者密碼錯誤，請確認後重新輸入！", "danger");
     if (pwInput) {
@@ -2479,7 +2490,7 @@ function logoutAdmin() {
 function impersonateClass(classId) {
   AppState.data.currentClassId = classId;
   AppState.isImpersonating = true;
-  saveStorage();
+  saveStorage(true);
   switchRole("teacher");
   const cls = getCurrentClass();
   showToast(`已進入【${cls ? cls.name : ''}】代管模式，您可隨時點選頂部「返回管理中心」`, "success");
@@ -3590,21 +3601,25 @@ async function initEnvConfig() {
     }
   }
 
-  // 若環境變數包含 GOOGLE_APP_SCRIPT_URL
-  const envGasUrl = getEnv("GOOGLE_APP_SCRIPT_URL");
-  if (envGasUrl) {
-    const localSaved = localStorage.getItem("ROUTINE_GAS_URL");
-    if (!localSaved) {
-      localStorage.setItem("ROUTINE_GAS_URL", envGasUrl);
-    }
+  // 檢查所有來源的 GAS 網址 (window.ENV, window.__ENV__, localStorage)
+  const cfg = getCloudSyncConfig();
+  if (cfg.gasUrl) {
     initCloudSyncStatus();
 
-    // 手機或其他裝置開啟時，若本機初次開啟或雲端有更新資料，背景自動自 Google 試算表同步最新資料庫
-    fetchLatestDataFromCloud(true).then(synced => {
-      if (synced) {
+    // 啟動時自動自 Google 試算表同步最新資料庫（非破壞性雙向合併）
+    fetchLatestDataFromCloud(true).then(res => {
+      hasInitialCloudSyncCompleted = true;
+      if (res && res.hasChanges) {
         renderApp();
       }
+    }).catch(() => {
+      hasInitialCloudSyncCompleted = true;
     });
+
+    // 啟動背景定期輪詢同步（保持登入時自動同步所有人正在更新的資料）
+    startBackgroundCloudPolling();
+  } else {
+    hasInitialCloudSyncCompleted = true;
   }
 }
 
@@ -3612,39 +3627,63 @@ async function initEnvConfig() {
 // Google 試算表 (Google Sheets & Apps Script) 雲端資料庫同步模組
 // ==========================================================================
 let isFetchingCloudData = false;
+let hasInitialCloudSyncCompleted = false;
 
 // ==========================================================================
 // 雙向非破壞性雲端資料合併引擎 (Non-destructive Cloud Merge Engine)
 // 核心保障：本機所有已登記內容絕對不被刪除或洗掉，除非老師明確撤銷 (deleteRecord)
 // ==========================================================================
 function mergeCloudDataWithLocal(cloudRaw) {
-  if (!cloudRaw || !Array.isArray(cloudRaw.classes)) return;
+  if (!cloudRaw || !Array.isArray(cloudRaw.classes)) return { hasChanges: false, addedRecordsCount: 0 };
   const cloudData = normalizeDataFromCloud(cloudRaw);
 
   if (!AppState.data || !Array.isArray(AppState.data.classes)) {
     AppState.data = cloudData;
-    return;
+    return { hasChanges: true, addedRecordsCount: 0 };
   }
+
+  let hasChanges = false;
+  let addedRecordsCount = 0;
 
   // 保留管理員密碼
   if (cloudData.adminPassword && (!AppState.data.adminPassword || AppState.data.adminPassword === "admin888")) {
     AppState.data.adminPassword = cloudData.adminPassword;
+    hasChanges = true;
   }
 
   cloudData.classes.forEach(cloudCls => {
     let localCls = AppState.data.classes.find(c => c.id === cloudCls.id);
     if (!localCls) {
       AppState.data.classes.push(cloudCls);
+      hasChanges = true;
       return;
     }
 
     // 保留班級設定
-    if (cloudCls.name) localCls.name = cloudCls.name;
-    if (cloudCls.teacherPassword) localCls.teacherPassword = cloudCls.teacherPassword;
-    if (cloudCls.warningThreshold && !localCls.warningThreshold) localCls.warningThreshold = cloudCls.warningThreshold;
-    if (cloudCls.resetMode && !localCls.resetMode) localCls.resetMode = cloudCls.resetMode;
-    if (cloudCls.customResetDate && !localCls.customResetDate) localCls.customResetDate = cloudCls.customResetDate;
-    if (cloudCls.currentExamPeriodId && !localCls.currentExamPeriodId) localCls.currentExamPeriodId = cloudCls.currentExamPeriodId;
+    if (cloudCls.name && localCls.name !== cloudCls.name) {
+      localCls.name = cloudCls.name;
+      hasChanges = true;
+    }
+    if (cloudCls.teacherPassword && localCls.teacherPassword !== cloudCls.teacherPassword) {
+      localCls.teacherPassword = cloudCls.teacherPassword;
+      hasChanges = true;
+    }
+    if (cloudCls.warningThreshold && localCls.warningThreshold !== cloudCls.warningThreshold) {
+      localCls.warningThreshold = cloudCls.warningThreshold;
+      hasChanges = true;
+    }
+    if (cloudCls.resetMode && localCls.resetMode !== cloudCls.resetMode) {
+      localCls.resetMode = cloudCls.resetMode;
+      hasChanges = true;
+    }
+    if (cloudCls.customResetDate && localCls.customResetDate !== cloudCls.customResetDate) {
+      localCls.customResetDate = cloudCls.customResetDate;
+      hasChanges = true;
+    }
+    if (cloudCls.currentExamPeriodId && localCls.currentExamPeriodId !== cloudCls.currentExamPeriodId) {
+      localCls.currentExamPeriodId = cloudCls.currentExamPeriodId;
+      hasChanges = true;
+    }
 
     // 整合註銷清單 (deletedRecordIds)：兩端註銷合併
     localCls.deletedRecordIds = localCls.deletedRecordIds || [];
@@ -3652,12 +3691,17 @@ function mergeCloudDataWithLocal(cloudRaw) {
       cloudCls.deletedRecordIds.forEach(id => {
         if (!localCls.deletedRecordIds.includes(id)) {
           localCls.deletedRecordIds.push(id);
+          hasChanges = true;
         }
       });
     }
 
     // 依據註銷清單過濾本機紀錄
+    const prevCount = (localCls.records || []).length;
     localCls.records = (localCls.records || []).filter(r => !localCls.deletedRecordIds.includes(r.id));
+    if (localCls.records.length !== prevCount) {
+      hasChanges = true;
+    }
 
     // 雙向合併：本機所有登記紀錄永遠保留！雲端有而本機沒有的紀錄，安全補進本機
     const localRecordIds = new Set(localCls.records.map(r => r.id));
@@ -3666,6 +3710,8 @@ function mergeCloudDataWithLocal(cloudRaw) {
         if (!localCls.deletedRecordIds.includes(cr.id) && !localRecordIds.has(cr.id)) {
           localCls.records.push(cr);
           localRecordIds.add(cr.id);
+          hasChanges = true;
+          addedRecordsCount++;
         }
       });
     }
@@ -3677,11 +3723,12 @@ function mergeCloudDataWithLocal(cloudRaw) {
       cloudCls.students.forEach(cs => {
         const ls = localCls.students.find(s => s.id === cs.id);
         if (ls) {
-          if (cs.name && !ls.name) ls.name = cs.name;
-          if (cs.code && !ls.code) ls.code = cs.code;
+          if (cs.name && !ls.name) { ls.name = cs.name; hasChanges = true; }
+          if (cs.code && !ls.code) { ls.code = cs.code; hasChanges = true; }
         } else {
           localCls.students.push(cs);
           localStuIds.add(cs.id);
+          hasChanges = true;
         }
       });
     }
@@ -3689,6 +3736,7 @@ function mergeCloudDataWithLocal(cloudRaw) {
     // 合併常規項目
     if (cloudCls.routineItems && !localCls.routineItems) {
       localCls.routineItems = cloudCls.routineItems;
+      hasChanges = true;
     }
 
     // 合併段考區間
@@ -3699,35 +3747,49 @@ function mergeCloudDataWithLocal(cloudRaw) {
         if (!localPeriodIds.has(cp.id)) {
           localCls.examPeriods.push(cp);
           localPeriodIds.add(cp.id);
+          hasChanges = true;
         }
       });
     }
   });
+
+  return { hasChanges, addedRecordsCount };
 }
 
 // 輔助函式：自 Google Apps Script 雲端拉取最新資料庫（支援手機開啟、多裝置同步，安全非破壞性合併）
 async function fetchLatestDataFromCloud(isSilent = true) {
   const cfg = getCloudSyncConfig();
-  if (!cfg.gasUrl || isFetchingCloudData) return false;
+  if (!cfg.gasUrl || isFetchingCloudData) return { success: false, hasChanges: false };
 
   isFetchingCloudData = true;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒逾時防呆
+
   try {
     const loadUrl = cfg.gasUrl + (cfg.gasUrl.includes("?") ? "&" : "?") + "action=load&_t=" + Date.now();
-    const res = await fetch(loadUrl, { method: "GET", mode: "cors", redirect: "follow" });
+    const res = await fetch(loadUrl, {
+      method: "GET",
+      mode: "cors",
+      redirect: "follow",
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
     if (!res.ok) throw new Error("HTTP " + res.status);
     const result = await res.json();
     if (result && result.status === "success" && result.data && Array.isArray(result.data.classes) && result.data.classes.length > 0) {
-      mergeCloudDataWithLocal(result.data);
+      const mergeInfo = mergeCloudDataWithLocal(result.data);
       const nowIso = new Date().toISOString();
       localStorage.setItem("ROUTINE_GAS_LASTSYNC", nowIso);
       saveStorage(true);
       updateCloudSyncBadge("online", "已同步最新");
-      return true;
+      return { success: true, ...mergeInfo };
     }
-    return false;
+    return { success: false, hasChanges: false };
   } catch (err) {
+    clearTimeout(timeoutId);
     if (!isSilent) console.warn("fetchLatestDataFromCloud error:", err);
-    return false;
+    return { success: false, hasChanges: false, error: err };
   } finally {
     isFetchingCloudData = false;
   }
@@ -3993,6 +4055,12 @@ function uploadToCloud(isSilent = false) {
         if (!AppState.data.cloudSyncConfig) AppState.data.cloudSyncConfig = {};
         AppState.data.cloudSyncConfig.lastSyncedAt = nowIso;
 
+        // 若雲端回傳經伺服端雙向合併後的最新資料庫，立即同步回本機
+        if (result.data && Array.isArray(result.data.classes)) {
+          mergeCloudDataWithLocal(result.data);
+          saveStorage(true);
+        }
+
         updateCloudSyncBadge("online", "已同步最新");
         if (!isSilent) {
           showToast(`已成功同步至 Google 試算表！（共 ${result.recordsCount || 0} 筆常規紀錄）`, "success");
@@ -4069,6 +4137,12 @@ function triggerAutoCloudSave() {
   const cfg = getCloudSyncConfig();
   if (!cfg.gasUrl || !cfg.autoSync) return;
 
+  // 核心安全防護：若尚未自雲端執行過初次下載與合併，切勿貿然將本機舊快取覆寫至雲端！
+  if (!hasInitialCloudSyncCompleted) {
+    console.warn("初次雲端同步尚未完成，已暫緩本次自動上傳以保護雲端資料安全。");
+    return;
+  }
+
   if (autoSaveCloudTimer) {
     clearTimeout(autoSaveCloudTimer);
   }
@@ -4077,8 +4151,110 @@ function triggerAutoCloudSave() {
 
   autoSaveCloudTimer = setTimeout(() => {
     uploadToCloud(true);
-  }, 2000); // 2秒防抖延遲
+  }, 1500); // 1.5秒防抖延遲
 }
+
+// ==========================================================================
+// 背景自動同步與即時多人連線輪詢管理 (Background Polling & Multi-device Live Sync)
+// ==========================================================================
+let cloudPollingTimer = null;
+
+// 當登入或在任何畫面停留時，啟動背景定期輪詢
+function startBackgroundCloudPolling() {
+  if (cloudPollingTimer) {
+    clearInterval(cloudPollingTimer);
+    cloudPollingTimer = null;
+  }
+
+  // 每 20 秒在背景安靜檢查雲端是否有其他人更新的資料
+  cloudPollingTimer = setInterval(() => {
+    const cfg = getCloudSyncConfig();
+    if (!cfg.gasUrl || !cfg.autoSync || isFetchingCloudData || autoSaveCloudTimer) return;
+
+    fetchLatestDataFromCloud(true).then(res => {
+      if (res && res.hasChanges) {
+        refreshCurrentViewAfterSync(res.addedRecordsCount);
+      }
+    });
+  }, 20000);
+}
+
+function stopBackgroundCloudPolling() {
+  if (cloudPollingTimer) {
+    clearInterval(cloudPollingTimer);
+    cloudPollingTimer = null;
+  }
+}
+
+// 雲端資料在背景更新後的智慧畫面刷新 (保持目前操作狀態，不破壞輸入焦點)
+function refreshCurrentViewAfterSync(addedCount = 0) {
+  const activeEl = document.activeElement;
+  const isUserTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
+
+  if (AppState.currentRole === "teacher") {
+    if (!isUserTyping) {
+      renderTeacherView();
+    }
+  } else if (AppState.currentRole === "admin") {
+    if (!isUserTyping) {
+      renderAdminView();
+    }
+  } else if (AppState.currentRole === "student") {
+    if (AppState.activeStudentPortalData) {
+      const stuId = AppState.activeStudentPortalData.student?.id;
+      const clsId = AppState.activeStudentPortalData.cls?.id;
+      const updatedCls = (AppState.data.classes || []).find(c => c.id === clsId);
+      if (updatedCls) {
+        const updatedStu = (updatedCls.students || []).find(s => s.id === stuId);
+        if (updatedStu) {
+          AppState.activeStudentPortalData.cls = updatedCls;
+          AppState.activeStudentPortalData.student = updatedStu;
+        }
+      }
+    }
+    renderStudentPortalView();
+  }
+
+  if (addedCount > 0) {
+    showToast(`☁️ 已即時自動同步最新資料（收到 ${addedCount} 筆新動態）`, "info");
+  }
+}
+
+// 當使用者切換標籤頁回來 (例如從別的分頁或手機其他 App 切回) 時，立即強制向雲端抓取最新資料！
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    const cfg = getCloudSyncConfig();
+    if (cfg.gasUrl && cfg.autoSync && !isFetchingCloudData && !autoSaveCloudTimer) {
+      fetchLatestDataFromCloud(true).then(res => {
+        if (res && res.hasChanges) {
+          refreshCurrentViewAfterSync(res.addedRecordsCount);
+        }
+      });
+    }
+  }
+});
+
+// 當視窗重新獲得焦點時觸發
+window.addEventListener("focus", () => {
+  const cfg = getCloudSyncConfig();
+  if (cfg.gasUrl && cfg.autoSync && !isFetchingCloudData && !autoSaveCloudTimer) {
+    fetchLatestDataFromCloud(true).then(res => {
+      if (res && res.hasChanges) {
+        refreshCurrentViewAfterSync(res.addedRecordsCount);
+      }
+    });
+  }
+});
+
+// 當網路重新連線時觸發
+window.addEventListener("online", () => {
+  showToast("網路已連線，正在同步最新雲端資料...", "info");
+  fetchLatestDataFromCloud(false).then(res => {
+    if (res && res.hasChanges) {
+      refreshCurrentViewAfterSync(res.addedRecordsCount);
+    }
+  });
+});
 
 // 應用程式初始化事件監聽
 document.addEventListener("DOMContentLoaded", () => {
