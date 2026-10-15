@@ -51,10 +51,10 @@ function getClassThreshold(cls) {
   return (!isNaN(t) && t > 0) ? t : 15;
 }
 
-// 取得班級接近警告的警戒門檻 (黃色警示，距門檻 2~3 次以內)
+// 取得班級接近警告的警戒門檻 (黃色警示，上限次數的前 5 次以內)
 function getClassCautionThreshold(cls) {
   const threshold = getClassThreshold(cls);
-  return Math.max(1, threshold - 3);
+  return Math.max(1, threshold - 5);
 }
 
 // 工具函式：生成隨機專屬代碼 (前半部為班級號碼組成，後半部為 4 碼英數完全亂數)
@@ -137,6 +137,14 @@ function initStorage() {
       // 2. 確保警告門檻存在
       if (typeof c.warningThreshold === "undefined" || c.warningThreshold === null) {
         c.warningThreshold = (c.id === "class-705") ? 10 : 15;
+      }
+      // 2.1 確保重置週期模式存在 (預設為 'exam_period' 每次段考重置，亦可為 'semester' 整學期累計，或 'custom' 自訂起算日)
+      if (!c.resetMode) {
+        c.resetMode = "exam_period";
+      }
+      // 2.2 確保已撤銷項目清單存在
+      if (!Array.isArray(c.deletedRecordIds)) {
+        c.deletedRecordIds = [];
       }
       // 3. 移除舊的硬編碼學校名
       if (c.school === "培英國中") {
@@ -229,13 +237,31 @@ function getExamPeriodForDate(cls, dateStr) {
   return getCurrentExamPeriod(cls);
 }
 
-// 統計學生在特定段考的優缺點數量
+// 統計學生在特定週期（段考、全學期或自訂起算日）的優缺點數量
 function getStudentStats(cls, studentId, examPeriodId = null) {
-  const targetPeriodId = examPeriodId || cls.currentExamPeriodId;
-  const records = cls.records.filter(r => 
-    r.studentId === studentId && 
-    (targetPeriodId === "all" || r.examPeriodId === targetPeriodId)
-  );
+  let targetPeriodId = examPeriodId;
+  if (!targetPeriodId && cls) {
+    const mode = cls.resetMode || "exam_period";
+    if (mode === "semester") {
+      targetPeriodId = "all"; // 整學期統一累計
+    } else if (mode === "custom") {
+      targetPeriodId = "custom"; // 依自訂時間起算
+    } else {
+      targetPeriodId = cls.currentExamPeriodId; // 預設依現行段考
+    }
+  }
+
+  const records = (cls.records || []).filter(r => {
+    if (r.studentId !== studentId) return false;
+    if (targetPeriodId === "all") return true;
+    if (targetPeriodId === "custom") {
+      if (cls.customResetDate) {
+        return (r.date || "") >= cls.customResetDate;
+      }
+      return true;
+    }
+    return r.examPeriodId === targetPeriodId;
+  });
 
   let demerits = 0;
   let merits = 0;
@@ -436,16 +462,36 @@ function renderTeacherView(cls, examPeriod) {
     tabWarningsTitleText.textContent = `🚨 警告名單 (${threshold}次)`;
   }
 
-  // 渲染目前段考橫幅
+  // 渲染目前段考橫幅與重置週期說明
   const periodBanner = document.getElementById("periodBannerContainer");
   if (periodBanner && examPeriod) {
     const warnCount = cls.students.filter(s => getStudentStats(cls, s.id).demerits >= threshold).length;
+    const cautionCount = cls.students.filter(s => {
+      const d = getStudentStats(cls, s.id).demerits;
+      return d >= getClassCautionThreshold(cls) && d < threshold;
+    }).length;
+
+    const resetMode = cls.resetMode || "exam_period";
+    let modeTag = "每次段考重置";
+    let modeDesc = `區間：${examPeriod.startDate || '未設定'} ~ ${examPeriod.endDate || '未設定'} (段考結束時歸零)`;
+    let modeTitle = `${cls.name} • ${examPeriod.name}`;
+
+    if (resetMode === "semester") {
+      modeTag = "整學期累計 (一學期更新一次)";
+      modeDesc = "整學期跨段考持續累計不歸零，全學期末才重置。亦可由下方分頁隨時依段考查閱歷史明細。";
+      modeTitle = `${cls.name} • 114學年度全學期累計`;
+    } else if (resetMode === "custom") {
+      modeTag = "自訂重置週期";
+      modeDesc = `自 ${cls.customResetDate || '起始日'} 起累計（由導師自訂歸零週期）。`;
+      modeTitle = `${cls.name} • 自訂累計週期`;
+    }
+
     periodBanner.innerHTML = `
       <div class="period-info">
-        <span class="period-badge-tag">目前計算週期</span>
+        <span class="period-badge-tag">${modeTag}</span>
         <div>
-          <div class="period-title">${cls.name} • ${examPeriod.name}</div>
-          <div class="period-dates">區間：${examPeriod.startDate || '未設定'} ~ ${examPeriod.endDate || '未設定'} (段考重新累積，不功過相抵)</div>
+          <div class="period-title">${modeTitle}</div>
+          <div class="period-dates">${modeDesc}</div>
         </div>
       </div>
       <div class="period-actions">
@@ -453,9 +499,13 @@ function renderTeacherView(cls, examPeriod) {
           <button class="btn btn-danger btn-sm" onclick="switchTeacherTab('warnings')">
             🚨 滿${threshold}次警戒名單 (${warnCount}人)
           </button>
-        ` : ''}
+        ` : (cautionCount > 0 ? `
+          <button class="btn btn-warning btn-sm" onclick="switchTeacherTab('warnings')" style="background: var(--warning-500); color: white; border: none;">
+            ⚠️ 接近上限名單 (${cautionCount}人)
+          </button>
+        ` : '')}
         <button class="btn btn-outline btn-sm" onclick="switchTeacherTab('periods')" style="background: rgba(255,255,255,0.15); color: white; border-color: rgba(255,255,255,0.3);">
-          ⚙️ 切換/管理段考
+          ⚙️ 週期與重置設定
         </button>
       </div>
     `;
@@ -522,10 +572,10 @@ function renderRecordTab(cls, examPeriod) {
       const isCaution = stats.demerits >= cautionThreshold && stats.demerits < threshold;
 
       html += `
-        <div class="seat-btn ${isSelected ? 'selected' : ''} ${isWarn ? 'danger-warn' : ''}" 
+        <div class="seat-btn ${isSelected ? 'selected' : ''} ${isWarn ? 'danger-warn' : (isCaution ? 'caution-warn' : '')}" 
              onclick="toggleStudentSelection('${student.id}')"
-             title="座號 ${student.seatNumber} ${student.name} | 缺點: ${stats.demerits}, 優點: ${stats.merits}">
-          ${isWarn ? `<div class="seat-warning-tag" title="已達警告門檻(${threshold}次)">!</div>` : ''}
+             title="座號 ${student.seatNumber} ${student.name} | 缺點: ${stats.demerits}/${threshold} (距滿警告剩 ${Math.max(0, threshold - stats.demerits)} 次), 優點: ${stats.merits}">
+          ${isWarn ? `<div class="seat-warning-tag danger" title="已達警告門檻(${threshold}次)">!</div>` : (isCaution ? `<div class="seat-warning-tag caution" title="接近警告上限 (累計${stats.demerits}次/剩${threshold - stats.demerits}次)">⚠️</div>` : '')}
           <div class="seat-num">${student.seatNumber}</div>
           <div class="seat-name">${student.name || '未設'}</div>
           <div class="seat-points">
@@ -746,6 +796,13 @@ function submitRoutineRecord(event) {
 
   saveStorage();
 
+  // 核心防護：登記完成後立即強制同步至 Google 試算表，確保資料絕對不遺失，且不會被後續登入操作洗掉
+  if (autoSaveCloudTimer) {
+    clearTimeout(autoSaveCloudTimer);
+    autoSaveCloudTimer = null;
+  }
+  uploadToCloud(true);
+
   // 清除備註與選取項目
   document.getElementById("recordNoteInput").value = "";
   AppState.selectedStudentIds.clear();
@@ -763,13 +820,24 @@ function submitRoutineRecord(event) {
   renderApp();
 }
 
-// 刪除 / 撤銷紀錄
+// 刪除 / 撤銷紀錄（只有老師手動撤銷時才會更動並從 Google 試算表中註銷）
 function deleteRecord(recordId) {
-  if (!confirm("確定要撤銷這筆登記嗎？")) return;
+  if (!confirm("確定要撤銷這筆登記紀錄嗎？撤銷後將從系統與 Google 試算表中註銷。")) return;
   const cls = getCurrentClass();
-  cls.records = cls.records.filter(r => r.id !== recordId);
+  cls.deletedRecordIds = cls.deletedRecordIds || [];
+  if (!cls.deletedRecordIds.includes(recordId)) {
+    cls.deletedRecordIds.push(recordId);
+  }
+  cls.records = (cls.records || []).filter(r => r.id !== recordId);
   saveStorage();
-  showToast("已撤銷登記紀錄", "success");
+
+  if (autoSaveCloudTimer) {
+    clearTimeout(autoSaveCloudTimer);
+    autoSaveCloudTimer = null;
+  }
+  uploadToCloud(true);
+
+  showToast("已撤銷登記紀錄，並同步至雲端試算表", "success");
   renderApp();
 }
 
@@ -810,7 +878,7 @@ function renderOverviewTab(cls, examPeriod) {
   // 動態更新下拉選單文字
   if (statusFilter && statusFilter.options.length >= 4) {
     statusFilter.options[1].textContent = `🚨 達警告門檻 (滿 ${threshold} 次)`;
-    statusFilter.options[2].textContent = `⚠️ 接近警告 (${cautionThreshold} ~ ${threshold - 1} 次)`;
+    statusFilter.options[2].textContent = `⚠️ 接近上限 (剩 1~5 次, 滿 ${cautionThreshold} 次)`;
     statusFilter.options[3].textContent = `✅ 常規正常 (< ${cautionThreshold} 次)`;
   }
 
@@ -869,11 +937,11 @@ function renderOverviewTab(cls, examPeriod) {
         </td>
         <td>
           ${isWarning ? `
-            <span class="badge-warning-danger">🚨 滿${threshold}次 (記警告)</span>
+            <span class="badge-warning-danger">🚨 滿${threshold}次 (已達警告)</span>
           ` : (isCaution ? `
-            <span class="badge-warning-caution">⚠️ 接近警告 (${stats.demerits})</span>
+            <span class="badge-warning-caution">⚠️ 接近上限 (累計${stats.demerits}次/剩${threshold - stats.demerits}次)</span>
           ` : `
-            <span class="badge-safe">常規正常</span>
+            <span class="badge-safe">✅ 常規正常</span>
           `)}
         </td>
         <td>
@@ -1011,7 +1079,7 @@ function renderWarningsTab(cls, examPeriod) {
     html += `
       <div>
         <h3 style="color: var(--warning-600); font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 8px; margin-bottom: 1rem;">
-          ⚠️ 缺點接近警告警戒名單 (${cautionThreshold} ~ ${threshold - 1} 次，需加強輔導與提醒)：共 ${cautionStudents.length} 位
+          ⚠️ 缺點接近警告警戒名單（前 5 次黃色警示，已累積 ${cautionThreshold} ~ ${threshold - 1} 次，距處分僅剩 1~5 次）：共 ${cautionStudents.length} 位
         </h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem;">
     `;
@@ -1401,11 +1469,70 @@ function renderPeriodsTab(cls) {
   if (!periodsList) return;
 
   const currentPeriod = getCurrentExamPeriod(cls);
+  const resetMode = cls.resetMode || "exam_period";
+  const customDate = cls.customResetDate || new Date().toISOString().split("T")[0];
 
   periodsList.innerHTML = `
+    <!-- 導師自訂重置週期設定卡片 -->
+    <div class="panel-card" style="border: 2px solid var(--primary-300); background: #f8fafc; margin-bottom: 1.5rem; padding: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px;">
+        <h4 style="font-size: 1.05rem; font-weight: 800; color: var(--slate-900); margin: 0; display: flex; align-items: center; gap: 6px;">
+          ⚙️ 班級常規重置與累計週期設定（依導師需求自訂）
+        </h4>
+        <span style="background: var(--primary-100); color: var(--primary-800); font-weight: 700; font-size: 0.75rem; padding: 3px 10px; border-radius: var(--radius-full);">
+          目前模式：${resetMode === 'semester' ? '整學期更新一次' : (resetMode === 'custom' ? '自訂時間重置' : '一次段考更新一次')}
+        </span>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--slate-600); margin-bottom: 1rem;">
+        每位老師常規管理作法不同，您可以自由選擇「一次段考重置一次」或「整學期才重置一次」，或自訂起算時間。無論何種模式，過去的所有登記內容均永久保留，家長與導師皆可按段考選單隨時查閱歷史資料。
+      </p>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+        <label style="border: 1.5px solid ${resetMode === 'exam_period' ? 'var(--primary-600)' : 'var(--slate-200)'}; background: ${resetMode === 'exam_period' ? 'var(--primary-50)' : 'white'}; border-radius: var(--radius-md); padding: 0.85rem; cursor: pointer; display: block;">
+          <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--slate-800);">
+            <input type="radio" name="classResetModeRadio" value="exam_period" ${resetMode === 'exam_period' ? 'checked' : ''} onchange="updateClassResetMode('exam_period')">
+            <span>📅 依每次段考重置（推薦預設）</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--slate-500); margin-top: 4px; padding-left: 20px;">
+            每次段考切換時點數獨立歸零重新累計（一次段考約1個月）。
+          </div>
+        </label>
+
+        <label style="border: 1.5px solid ${resetMode === 'semester' ? 'var(--primary-600)' : 'var(--slate-200)'}; background: ${resetMode === 'semester' ? 'var(--primary-50)' : 'white'}; border-radius: var(--radius-md); padding: 0.85rem; cursor: pointer; display: block;">
+          <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--slate-800);">
+            <input type="radio" name="classResetModeRadio" value="semester" ${resetMode === 'semester' ? 'checked' : ''} onchange="updateClassResetMode('semester')">
+            <span>🎓 整學期統一累計（整學期更新一次）</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--slate-500); margin-top: 4px; padding-left: 20px;">
+            跨段考持續累計不歸零，全學期末才重置。段考歷史仍可隨時調閱。
+          </div>
+        </label>
+
+        <label style="border: 1.5px solid ${resetMode === 'custom' ? 'var(--primary-600)' : 'var(--slate-200)'}; background: ${resetMode === 'custom' ? 'var(--primary-50)' : 'white'}; border-radius: var(--radius-md); padding: 0.85rem; cursor: pointer; display: block;">
+          <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--slate-800);">
+            <input type="radio" name="classResetModeRadio" value="custom" ${resetMode === 'custom' ? 'checked' : ''} onchange="updateClassResetMode('custom')">
+            <span>⏱️ 自訂歸零起算日期</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--slate-500); margin-top: 4px; padding-left: 20px;">
+            由老師自訂歸零起算時間，只累計指定日期之後的登記項目。
+          </div>
+        </label>
+      </div>
+
+      ${resetMode === 'custom' ? `
+        <div style="background: white; border: 1px solid var(--slate-200); border-radius: var(--radius-md); padding: 0.85rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--slate-700);">自訂重置起算日：</span>
+          <input type="date" id="customResetDateInput" value="${customDate}" class="input-text" style="width: auto; padding: 4px 8px; font-size: 0.85rem;" onchange="updateClassCustomResetDate(this.value)">
+          <button type="button" class="btn btn-outline btn-sm" onclick="resetClassCycleToToday()" style="color: var(--primary-700); border-color: var(--primary-300);">
+            🔄 立即以此時點歸零重算
+          </button>
+        </div>
+      ` : ''}
+    </div>
+
     <div style="background: var(--primary-50); border: 1px solid var(--primary-200); border-radius: var(--radius-md); padding: 0.9rem 1.25rem; margin-bottom: 1.25rem; font-size: 0.85rem; color: var(--primary-900); line-height: 1.5;">
-      💡 <strong>段考週期與歸零機制說明：</strong><br>
-      您可以自由編輯每次段考的<strong>開始與結束累積日期</strong>。當段考結束要進入下一個週期時，點選<strong>「切換為現行段考」</strong>（或於編輯區間中勾選設為現行），全班優缺點計分即刻<strong>歸零重新累計</strong>。先前的所有常規紀錄仍會完整保存，家長與導師可隨時依段考選單調閱歷史明細。
+      💡 <strong>段考累積區間日期設定：</strong><br>
+      您可以自由編輯每次段考的<strong>開始與結束累積日期</strong>。若您採用「每次段考重置」，點選「切換為現行段考」即會以此段考歸零重計；若採用「整學期更新一次」，則全學期持續累計，段考區間僅作為分段檢視依據。先前的所有常規紀錄仍會完整保存，家長與導師可隨時依段考選單調閱歷史明細。
     </div>
 
     ${cls.examPeriods.map(p => {
@@ -1451,8 +1578,66 @@ function setActiveExamPeriod(periodId) {
   const periodFilter = document.getElementById("overviewPeriodFilter");
   if (periodFilter) periodFilter.innerHTML = "";
   saveStorage();
+  if (autoSaveCloudTimer) {
+    clearTimeout(autoSaveCloudTimer);
+    autoSaveCloudTimer = null;
+  }
+  uploadToCloud(true);
   renderApp();
   showToast("已切換為現行段考！優缺點即時歸零並重新以此段考累計", "success");
+}
+
+// 變更班級重置模式（依段考重置 / 整學期重置 / 自訂時間重置）
+function updateClassResetMode(mode) {
+  const cls = getCurrentClass();
+  if (!cls) return;
+  cls.resetMode = mode;
+  saveStorage();
+  if (autoSaveCloudTimer) {
+    clearTimeout(autoSaveCloudTimer);
+    autoSaveCloudTimer = null;
+  }
+  uploadToCloud(true);
+  renderApp();
+  const modeNames = {
+    exam_period: "依每次段考重置（每次段考開始獨立歸零）",
+    semester: "整學期統一累計（整學期更新一次，不因段考歸零）",
+    custom: "自訂歸零起算日期模式"
+  };
+  showToast(`已切換常規重置模式為：${modeNames[mode] || mode}`, "success");
+}
+
+// 變更自訂重置起算日
+function updateClassCustomResetDate(dateStr) {
+  const cls = getCurrentClass();
+  if (!cls) return;
+  cls.customResetDate = dateStr;
+  saveStorage();
+  if (autoSaveCloudTimer) {
+    clearTimeout(autoSaveCloudTimer);
+    autoSaveCloudTimer = null;
+  }
+  uploadToCloud(true);
+  renderApp();
+  showToast(`已更新自訂重置起算日為：${dateStr}`, "success");
+}
+
+// 立即以今天為基準歸零重置新週期
+function resetClassCycleToToday() {
+  const today = new Date().toISOString().split("T")[0];
+  if (!confirm(`確定要以今天 (${today}) 為基準歸零重新開始新週期嗎？\n\n※ 先前登記的常規項目仍會永久完整保存，家長與導師隨時可調閱歷史記錄。`)) return;
+  const cls = getCurrentClass();
+  if (!cls) return;
+  cls.resetMode = "custom";
+  cls.customResetDate = today;
+  saveStorage();
+  if (autoSaveCloudTimer) {
+    clearTimeout(autoSaveCloudTimer);
+    autoSaveCloudTimer = null;
+  }
+  uploadToCloud(true);
+  renderApp();
+  showToast(`已成功歸零！全班常規自今日 (${today}) 起重新累計`, "success");
 }
 
 // 新增段考對話框 (支援導師或管理員指定班級)
@@ -1643,8 +1828,9 @@ function renderStudentView() {
   // 計算該段考 (或全部) 之統計數據
   const stats = getStudentStats(activeClass, student.id, selectedPeriodId);
   const threshold = getClassThreshold(activeClass);
+  const cautionThreshold = getClassCautionThreshold(activeClass);
   const isWarning = selectedPeriodId !== "all" && stats.demerits >= threshold;
-  const isCaution = selectedPeriodId !== "all" && stats.demerits >= Math.max(1, threshold - 3) && stats.demerits < threshold;
+  const isCaution = selectedPeriodId !== "all" && stats.demerits >= cautionThreshold && stats.demerits < threshold;
   const remaining = Math.max(0, threshold - stats.demerits);
 
   // 學生資訊抬頭
@@ -2066,6 +2252,13 @@ function switchTeacherTab(tabName) {
 
 // 切換角色 (landing | teacher | student | admin)
 function switchRole(role) {
+  // 切換角色前若有未完成的雲端自動儲存，立即強制同步至 Google 試算表，確保資料絕對不遺失
+  if (autoSaveCloudTimer) {
+    clearTimeout(autoSaveCloudTimer);
+    autoSaveCloudTimer = null;
+    uploadToCloud(true);
+  }
+
   // 核心安全防護：一旦離開管理員專屬後台，自動重設管理員登入身分，防止資料庫連結外洩
   if (AppState.currentRole === "admin" && role !== "admin") {
     AppState.isAdminLoggedIn = false;
@@ -3044,6 +3237,20 @@ function renderAdminPeriods() {
           </button>
         </div>
       </div>
+
+      <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--slate-200); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <div style="font-size: 0.88rem; color: var(--slate-700);">
+          <strong>常規重置統計模式：</strong>
+          <select class="input-select" style="width: auto; padding: 3px 8px; font-size: 0.82rem;" onchange="adminUpdateClassResetMode('${targetClass.id}', this.value)">
+            <option value="exam_period" ${targetClass.resetMode === 'exam_period' ? 'selected' : ''}>📅 依每次段考重置（每次段考開始獨立歸零）</option>
+            <option value="semester" ${targetClass.resetMode === 'semester' ? 'selected' : ''}>🎓 整學期統一累計（整學期更新一次，不因段考歸零）</option>
+            <option value="custom" ${targetClass.resetMode === 'custom' ? 'selected' : ''}>⏱️ 自訂起算日期模式</option>
+          </select>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--slate-400);">
+          ※ 各班導師亦可於導師工作台「週期與重置設定」中依教學需求自行設定
+        </div>
+      </div>
     </div>
 
     <div class="panel-card">
@@ -3092,6 +3299,25 @@ function renderAdminPeriods() {
 function onAdminSelectClassForPeriods(classId) {
   AppState.adminSelectedClassId = classId;
   renderAdminPeriods();
+}
+
+function adminUpdateClassResetMode(classId, mode) {
+  const cls = AppState.data.classes.find(c => c.id === classId);
+  if (!cls) return;
+  cls.resetMode = mode;
+  saveStorage();
+  if (autoSaveCloudTimer) {
+    clearTimeout(autoSaveCloudTimer);
+    autoSaveCloudTimer = null;
+  }
+  uploadToCloud(true);
+  renderAdminPeriods();
+  const modeNames = {
+    exam_period: "依每次段考重置（每次段考開始獨立歸零）",
+    semester: "整學期統一累計（整學期更新一次，不因段考歸零）",
+    custom: "自訂起算日期模式"
+  };
+  showToast(`已更新【${cls.name}】重置模式為：${modeNames[mode] || mode}`, "success");
 }
 
 function adminSwitchClassPeriod(classId, periodId) {
@@ -3387,7 +3613,99 @@ async function initEnvConfig() {
 // ==========================================================================
 let isFetchingCloudData = false;
 
-// 輔助函式：自 Google Apps Script 雲端拉取最新資料庫（支援手機開啟、多裝置同步）
+// ==========================================================================
+// 雙向非破壞性雲端資料合併引擎 (Non-destructive Cloud Merge Engine)
+// 核心保障：本機所有已登記內容絕對不被刪除或洗掉，除非老師明確撤銷 (deleteRecord)
+// ==========================================================================
+function mergeCloudDataWithLocal(cloudRaw) {
+  if (!cloudRaw || !Array.isArray(cloudRaw.classes)) return;
+  const cloudData = normalizeDataFromCloud(cloudRaw);
+
+  if (!AppState.data || !Array.isArray(AppState.data.classes)) {
+    AppState.data = cloudData;
+    return;
+  }
+
+  // 保留管理員密碼
+  if (cloudData.adminPassword && (!AppState.data.adminPassword || AppState.data.adminPassword === "admin888")) {
+    AppState.data.adminPassword = cloudData.adminPassword;
+  }
+
+  cloudData.classes.forEach(cloudCls => {
+    let localCls = AppState.data.classes.find(c => c.id === cloudCls.id);
+    if (!localCls) {
+      AppState.data.classes.push(cloudCls);
+      return;
+    }
+
+    // 保留班級設定
+    if (cloudCls.name) localCls.name = cloudCls.name;
+    if (cloudCls.teacherPassword) localCls.teacherPassword = cloudCls.teacherPassword;
+    if (cloudCls.warningThreshold && !localCls.warningThreshold) localCls.warningThreshold = cloudCls.warningThreshold;
+    if (cloudCls.resetMode && !localCls.resetMode) localCls.resetMode = cloudCls.resetMode;
+    if (cloudCls.customResetDate && !localCls.customResetDate) localCls.customResetDate = cloudCls.customResetDate;
+    if (cloudCls.currentExamPeriodId && !localCls.currentExamPeriodId) localCls.currentExamPeriodId = cloudCls.currentExamPeriodId;
+
+    // 整合註銷清單 (deletedRecordIds)：兩端註銷合併
+    localCls.deletedRecordIds = localCls.deletedRecordIds || [];
+    if (Array.isArray(cloudCls.deletedRecordIds)) {
+      cloudCls.deletedRecordIds.forEach(id => {
+        if (!localCls.deletedRecordIds.includes(id)) {
+          localCls.deletedRecordIds.push(id);
+        }
+      });
+    }
+
+    // 依據註銷清單過濾本機紀錄
+    localCls.records = (localCls.records || []).filter(r => !localCls.deletedRecordIds.includes(r.id));
+
+    // 雙向合併：本機所有登記紀錄永遠保留！雲端有而本機沒有的紀錄，安全補進本機
+    const localRecordIds = new Set(localCls.records.map(r => r.id));
+    if (Array.isArray(cloudCls.records)) {
+      cloudCls.records.forEach(cr => {
+        if (!localCls.deletedRecordIds.includes(cr.id) && !localRecordIds.has(cr.id)) {
+          localCls.records.push(cr);
+          localRecordIds.add(cr.id);
+        }
+      });
+    }
+
+    // 合併學生名冊（以本機為主，補齊雲端新增的學生）
+    if (Array.isArray(cloudCls.students)) {
+      localCls.students = localCls.students || [];
+      const localStuIds = new Set(localCls.students.map(s => s.id));
+      cloudCls.students.forEach(cs => {
+        const ls = localCls.students.find(s => s.id === cs.id);
+        if (ls) {
+          if (cs.name && !ls.name) ls.name = cs.name;
+          if (cs.code && !ls.code) ls.code = cs.code;
+        } else {
+          localCls.students.push(cs);
+          localStuIds.add(cs.id);
+        }
+      });
+    }
+
+    // 合併常規項目
+    if (cloudCls.routineItems && !localCls.routineItems) {
+      localCls.routineItems = cloudCls.routineItems;
+    }
+
+    // 合併段考區間
+    if (Array.isArray(cloudCls.examPeriods) && cloudCls.examPeriods.length > 0) {
+      localCls.examPeriods = localCls.examPeriods || [];
+      const localPeriodIds = new Set(localCls.examPeriods.map(p => p.id));
+      cloudCls.examPeriods.forEach(cp => {
+        if (!localPeriodIds.has(cp.id)) {
+          localCls.examPeriods.push(cp);
+          localPeriodIds.add(cp.id);
+        }
+      });
+    }
+  });
+}
+
+// 輔助函式：自 Google Apps Script 雲端拉取最新資料庫（支援手機開啟、多裝置同步，安全非破壞性合併）
 async function fetchLatestDataFromCloud(isSilent = true) {
   const cfg = getCloudSyncConfig();
   if (!cfg.gasUrl || isFetchingCloudData) return false;
@@ -3399,7 +3717,7 @@ async function fetchLatestDataFromCloud(isSilent = true) {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const result = await res.json();
     if (result && result.status === "success" && result.data && Array.isArray(result.data.classes) && result.data.classes.length > 0) {
-      AppState.data = normalizeDataFromCloud(result.data);
+      mergeCloudDataWithLocal(result.data);
       const nowIso = new Date().toISOString();
       localStorage.setItem("ROUTINE_GAS_LASTSYNC", nowIso);
       saveStorage(true);
@@ -3722,13 +4040,13 @@ function downloadFromCloud() {
     .then(res => res.json())
     .then(result => {
       if (result.status === "success" && result.data && result.data.classes) {
-        AppState.data = normalizeDataFromCloud(result.data);
+        mergeCloudDataWithLocal(result.data);
         const nowIso = new Date().toISOString();
         localStorage.setItem("ROUTINE_GAS_LASTSYNC", nowIso);
         saveStorage(true); // 存入 LocalStorage，略過立即回傳雲端
         renderApp();
         updateCloudSyncBadge("online", "已同步最新");
-        showToast("已成功從 Google 試算表同步下載最新資料！", "success");
+        showToast("已成功從 Google 試算表同步下載並整合最新資料！", "success");
         closeAllModals();
       } else if (result.status === "empty") {
         showToast(result.message || "雲端試算表尚無資料庫，請先執行上傳備份！", "warning");

@@ -491,14 +491,23 @@ body {
   color: var(--danger-600);
 }
 
+.seat-btn.caution-warn {
+  border-color: var(--warning-500);
+  background: #fffbeb;
+}
+
+.seat-btn.caution-warn .seat-num {
+  color: var(--warning-600);
+}
+
 .seat-warning-tag {
   position: absolute;
   top: -4px;
   right: -4px;
   background: var(--danger-600);
   color: white;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   font-size: 0.65rem;
   display: flex;
@@ -506,6 +515,14 @@ body {
   justify-content: center;
   font-weight: 800;
   border: 1.5px solid white;
+}
+
+.seat-warning-tag.danger {
+  background: var(--danger-600);
+}
+
+.seat-warning-tag.caution {
+  background: var(--warning-500);
 }
 
 /* Quick Selection Utilities */
